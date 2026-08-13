@@ -128,9 +128,11 @@ class HwpxPackage:
         Path(dst).write_bytes(out.getvalue())
 
     def extract_to(self, dirpath):
-        dirpath = Path(dirpath)
+        base = Path(dirpath).resolve()
         for name in self.names():
-            target = dirpath / name
+            target = (base / name).resolve()
+            if not target.is_relative_to(base):
+                raise PackageError(f"안전하지 않은 엔트리 경로: {name}")
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(self.read(name))
         return self.names()

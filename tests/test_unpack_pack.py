@@ -1,4 +1,8 @@
-from core.package import HwpxPackage, pack_dir
+import zipfile
+
+import pytest
+
+from core.package import HwpxPackage, PackageError, pack_dir
 from tests.fixture import build_minimal_hwpx
 
 
@@ -29,7 +33,6 @@ def test_pack_with_source_is_byte_preserving(tmp_path):
 
 
 def test_pack_without_source_keeps_mimetype_first(tmp_path):
-    import zipfile
     src = build_minimal_hwpx(tmp_path / "a.hwpx")
     outdir = tmp_path / "unpacked"
     HwpxPackage.open(src).extract_to(outdir)
@@ -38,3 +41,28 @@ def test_pack_without_source_keeps_mimetype_first(tmp_path):
     with zipfile.ZipFile(out) as zf:
         assert zf.infolist()[0].filename == "mimetype"
         assert zf.infolist()[0].compress_type == zipfile.ZIP_STORED
+
+
+def test_extract_to_rejects_parent_traversal_entry(tmp_path):
+    evil = tmp_path / "evil.hwpx"
+    with zipfile.ZipFile(evil, "w") as zf:
+        zf.writestr("mimetype", "application/hwp+zip")
+        zf.writestr("../evil.txt", "pwned")
+    outdir = tmp_path / "unpacked"
+    outdir.mkdir()
+    with pytest.raises(PackageError):
+        HwpxPackage.open(evil).extract_to(outdir)
+    assert not (tmp_path / "evil.txt").exists()
+
+
+def test_extract_to_rejects_absolute_entry(tmp_path):
+    evil = tmp_path / "evil_abs.hwpx"
+    marker = tmp_path / "outside_marker.txt"
+    with zipfile.ZipFile(evil, "w") as zf:
+        zf.writestr("mimetype", "application/hwp+zip")
+        zf.writestr(str(marker), "pwned")
+    outdir = tmp_path / "unpacked_abs"
+    outdir.mkdir()
+    with pytest.raises(PackageError):
+        HwpxPackage.open(evil).extract_to(outdir)
+    assert not marker.exists()
