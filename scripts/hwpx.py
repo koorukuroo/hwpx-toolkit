@@ -3,12 +3,13 @@
 import argparse
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import analyze, guards  # noqa: E402
-from core.package import HwpxPackage, pack_dir  # noqa: E402
+from core.package import HwpxPackage, PackageError, pack_dir  # noqa: E402
 
 
 def cmd_validate(args):
@@ -77,7 +78,11 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (PackageError, ET.ParseError, OSError) as e:
+        print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
+        return 2
 
 
 if __name__ == "__main__":

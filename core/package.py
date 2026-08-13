@@ -101,6 +101,8 @@ class HwpxPackage:
             new_offsets[name] = out.tell()
             if name in replacements:
                 raw = replacements[name]
+                if info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                    raise UnsupportedZipError(f"지원하지 않는 압축 방식: {name}")
                 crc = zlib.crc32(raw) & 0xFFFFFFFF
                 if info.compress_type == zipfile.ZIP_STORED:
                     comp = raw
@@ -130,6 +132,8 @@ class HwpxPackage:
     def extract_to(self, dirpath):
         base = Path(dirpath).resolve()
         for name in self.names():
+            if name.endswith("/"):
+                continue
             target = (base / name).resolve()
             if not target.is_relative_to(base):
                 raise PackageError(f"안전하지 않은 엔트리 경로: {name}")

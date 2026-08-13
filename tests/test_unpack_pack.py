@@ -66,3 +66,16 @@ def test_extract_to_rejects_absolute_entry(tmp_path):
     with pytest.raises(PackageError):
         HwpxPackage.open(evil).extract_to(outdir)
     assert not marker.exists()
+
+
+def test_extract_to_skips_explicit_directory_entries(tmp_path):
+    src = tmp_path / "with_dirs.hwpx"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("mimetype", "application/hwp+zip")
+        zf.writestr("Contents/", "")  # 명시적 디렉터리 엔트리
+        zf.writestr("Contents/section0.xml", "<hs:sec/>")
+    outdir = tmp_path / "unpacked_dirs"
+    names = HwpxPackage.open(src).extract_to(outdir)
+    assert "Contents/" in names  # 목록에는 남아 있어도
+    assert (outdir / "Contents" / "section0.xml").read_text(encoding="utf-8") == "<hs:sec/>"
+    assert not (outdir / "Contents").is_file()

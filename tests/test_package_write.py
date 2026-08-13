@@ -1,6 +1,9 @@
 import zipfile
-from core.package import HwpxPackage
-from tests.fixture import build_minimal_hwpx
+
+import pytest
+
+from core.package import HwpxPackage, PackageError, UnsupportedZipError
+from tests.fixture import MIMETYPE, build_minimal_hwpx
 
 
 def test_noop_rewrite_is_byte_identical(tmp_path):
@@ -36,8 +39,44 @@ def test_replace_one_entry_preserves_others(tmp_path):
 
 
 def test_replace_unknown_name_raises(tmp_path):
-    import pytest
-    from core.package import PackageError
     src = build_minimal_hwpx(tmp_path / "src.hwpx")
     with pytest.raises(PackageError):
         HwpxPackage.open(src).write_replaced(tmp_path / "x.hwpx", {"없음.xml": b""})
+
+
+def test_write_replaced_rejects_non_deflate_entry(tmp_path):
+    pytest.importorskip("bz2")
+    src = tmp_path / "bz2.hwpx"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr(zipfile.ZipInfo("mimetype"), MIMETYPE.encode("utf-8"),
+                    compress_type=zipfile.ZIP_STORED)
+        zf.writestr(zipfile.ZipInfo("settings.xml"), b"<a/>",
+                    compress_type=zipfile.ZIP_BZIP2)
+
+    pkg = HwpxPackage.open(src)
+    with pytest.raises(UnsupportedZipError):
+        pkg.write_replaced(tmp_path / "out.hwpx", {"settings.xml": b"<b/>"})
+
+
+def test_replace_early_entry_shifts_offsets_of_trailing_entries(tmp_path):
+    """version.xml(2번째 엔트리)을 다른 길이로 교체해도 뒤따르는 엔트리의
+    중앙 디렉터리 오프셋이 올바르게 패치되는지 확인 (회귀 테스트)."""
+    src = build_minimal_hwpx(tmp_path / "src.hwpx")
+    dst = tmp_path / "dst.hwpx"
+    pkg = HwpxPackage.open(src)
+    assert pkg.names()[1] == "version.xml"
+
+    new_version = pkg.read_text("version.xml").replace(
+        'appVersion="0.1"', 'appVersion="0.1-a-much-longer-value-than-before"')
+    pkg.write_replaced(dst, {"version.xml": new_version.encode("utf-8")})
+
+    with zipfile.ZipFile(dst) as zf:
+        assert zf.testzip() is None
+        assert zf.read("version.xml").decode("utf-8") == new_version
+
+        with zipfile.ZipFile(src) as za:
+            for name in ("Contents/section0.xml", "Contents/header.xml"):
+                assert zf.read(name) == za.read(name)
+                ia, ib = za.getinfo(name), zf.getinfo(name)
+                assert (ia.CRC, ia.compress_size, ia.file_size) == \
+                       (ib.CRC, ib.compress_size, ib.file_size)
