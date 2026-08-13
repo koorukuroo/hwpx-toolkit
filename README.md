@@ -1,0 +1,24 @@
+# hwpx-toolkit
+
+한글(Hancom Office) HWPX 문서를 생성·읽기·편집·검증하는 MIT 라이선스 Claude 스킬.
+
+- 순수 Python stdlib 코어 (pip install 불필요)
+- 원본 바이트 보존 편집 (변경 엔트리 외 바이트 동일)
+- 전달 전 필수 검증 게이트
+
+## 사용법 (Phase 1)
+
+    python3 scripts/hwpx.py extract 문서.hwpx            # 텍스트 추출
+    python3 scripts/hwpx.py extract 문서.hwpx --format markdown
+    python3 scripts/hwpx.py analyze 문서.hwpx            # 구조/슬롯 JSON
+    python3 scripts/hwpx.py validate 문서.hwpx           # 구조 검증
+    python3 scripts/hwpx.py unpack 문서.hwpx ./out/      # ZIP 해체
+    python3 scripts/hwpx.py pack ./out/ 결과.hwpx --source 문서.hwpx
+
+## 개발
+
+    python3 -m pytest tests/ -v
+
+## 라이선스
+
+MIT — [LICENSE](LICENSE) 참조. 설계 배경은 docs/superpowers/specs/ 참조.
