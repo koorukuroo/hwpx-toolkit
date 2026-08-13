@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import analyze, guards  # noqa: E402
+from core.package import HwpxPackage, pack_dir  # noqa: E402
 
 
 def cmd_validate(args):
@@ -30,6 +31,18 @@ def cmd_analyze(args):
     return 0
 
 
+def cmd_unpack(args):
+    names = HwpxPackage.open(args.file).extract_to(args.dir)
+    print(json.dumps({"ok": True, "entries": len(names)}, ensure_ascii=False))
+    return 0
+
+
+def cmd_pack(args):
+    pack_dir(args.dir, args.out, source=args.source)
+    print(json.dumps({"ok": True}, ensure_ascii=False))
+    return 0
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="hwpx")
     sub = p.add_subparsers(dest="command", required=True)
@@ -47,6 +60,17 @@ def build_parser():
     a.add_argument("file")
     a.add_argument("--slots", action="store_true", help="편집 슬롯만 출력")
     a.set_defaults(func=cmd_analyze)
+
+    u = sub.add_parser("unpack", help="HWPX를 디렉터리로 해체")
+    u.add_argument("file")
+    u.add_argument("dir")
+    u.set_defaults(func=cmd_unpack)
+
+    k = sub.add_parser("pack", help="디렉터리를 HWPX로 패킹")
+    k.add_argument("dir")
+    k.add_argument("out")
+    k.add_argument("--source", help="바이트 보존 기준이 될 원본 HWPX")
+    k.set_defaults(func=cmd_pack)
 
     return p
 

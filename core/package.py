@@ -126,3 +126,40 @@ class HwpxPackage:
         struct.pack_into("<II", eocd_rec, 12, cd_size, cd_start)
         out.write(eocd_rec)
         Path(dst).write_bytes(out.getvalue())
+
+    def extract_to(self, dirpath):
+        dirpath = Path(dirpath)
+        for name in self.names():
+            target = dirpath / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(self.read(name))
+        return self.names()
+
+
+def pack_dir(dirpath, dst, source=None):
+    dirpath = Path(dirpath)
+    files = {str(f.relative_to(dirpath)).replace("\\", "/"): f
+             for f in dirpath.rglob("*") if f.is_file()}
+    if source is not None:
+        pkg = HwpxPackage.open(source)
+        src_names = set(pkg.names())
+        extra = set(files) - src_names
+        if extra:
+            raise PackageError(f"원본에 없는 파일 (엔트리 추가는 Phase 3+): {sorted(extra)}")
+        replacements = {}
+        for name, f in files.items():
+            data = f.read_bytes()
+            if data != pkg.read(name):
+                replacements[name] = data
+        pkg.write_replaced(dst, replacements)
+    else:
+        names = sorted(files)
+        if "mimetype" in files:
+            names.remove("mimetype")
+            names.insert(0, "mimetype")
+        with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name in names:
+                ctype = (zipfile.ZIP_STORED if name == "mimetype"
+                         else zipfile.ZIP_DEFLATED)
+                zf.writestr(zipfile.ZipInfo(name), files[name].read_bytes(),
+                            compress_type=ctype)
