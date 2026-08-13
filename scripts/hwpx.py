@@ -21,6 +21,15 @@ def cmd_extract(args):
     return 0
 
 
+def cmd_analyze(args):
+    if args.slots:
+        result = analyze.extract_slots(args.file)
+    else:
+        result = analyze.analyze_document(args.file)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="hwpx")
     sub = p.add_subparsers(dest="command", required=True)
@@ -33,6 +42,11 @@ def build_parser():
     e.add_argument("file")
     e.add_argument("--format", choices=["text", "markdown"], default="text")
     e.set_defaults(func=cmd_extract)
+
+    a = sub.add_parser("analyze", help="구조/슬롯 분석")
+    a.add_argument("file")
+    a.add_argument("--slots", action="store_true", help="편집 슬롯만 출력")
+    a.set_defaults(func=cmd_analyze)
 
     return p
 
