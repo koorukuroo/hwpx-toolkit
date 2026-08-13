@@ -65,17 +65,30 @@ def validate_package(path):
                 continue
             children = coll_el.findall(f"{{{NS_HH}}}{child}")
             declared = coll_el.get("itemCnt")
-            if declared is not None and int(declared) != len(children):
-                errors.append(
-                    f"itemcnt-mismatch: {coll} itemCnt={declared}, 실제={len(children)}")
+            if declared is not None:
+                try:
+                    declared_n = int(declared)
+                except ValueError:
+                    errors.append(
+                        f"itemcnt-mismatch: {coll} itemCnt 비정수 '{declared}'")
+                else:
+                    if declared_n != len(children):
+                        errors.append(
+                            f"itemcnt-mismatch: {coll} itemCnt={declared}, 실제={len(children)}")
             defined[child] = {c.get("id") for c in children}
 
     for sec_name in sections:
         tree = trees.get(sec_name)
         if tree is None:
             continue
+        used_by_attr = {attr: set() for _, _, attr in _ID_GROUPS}
+        for el in tree.iter():
+            for attr in used_by_attr:
+                value = el.attrib.get(attr)
+                if value is not None:
+                    used_by_attr[attr].add(value)
         for coll, child, attr in _ID_GROUPS:
-            used = set(re.findall(rf'{attr}="(\d+)"', pkg.read_text(sec_name)))
+            used = used_by_attr[attr]
             missing = used - defined.get(child, set())
             if header is not None and missing:
                 errors.append(

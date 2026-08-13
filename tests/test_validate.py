@@ -71,3 +71,24 @@ def test_missing_secpr_fails(tmp_path):
                    (sec[:start] + sec[end:]).encode("utf-8"))
     r = validate_package(bad)
     assert any(e.startswith("secpr-missing") for e in r["errors"])
+
+
+def test_itemcnt_non_numeric_reports_error_without_crash(tmp_path):
+    from core.package import HwpxPackage
+    src = build_minimal_hwpx(tmp_path / "src.hwpx")
+    bad = tmp_path / "bad.hwpx"
+    header = HwpxPackage.open(src).read_text("Contents/header.xml")
+    header = header.replace('charProperties itemCnt="1"', 'charProperties itemCnt="abc"')
+    _replace_entry(src, bad, "Contents/header.xml", header.encode("utf-8"))
+    r = validate_package(bad)  # must not raise
+    assert not r["ok"]
+    assert any(e.startswith("itemcnt-mismatch") for e in r["errors"])
+
+
+def test_body_text_with_ref_like_string_is_not_a_dangling_ref(tmp_path):
+    p = build_minimal_hwpx(
+        tmp_path / "ok.hwpx",
+        body_texts=['이것은 charPrIDRef="99" 텍스트'],
+    )
+    r = validate_package(p)
+    assert r["ok"], r["errors"]
