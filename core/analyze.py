@@ -91,12 +91,15 @@ def extract_slots(path):
     pkg = HwpxPackage.open(path)
     slots = []
     table_index = 0
+    p_idx = 0
     for name, root in _sections(pkg):
-        for p_idx, p in enumerate(root.findall(_q("p"))):
+        for p in root.findall(_q("p")):
             tbls = [tbl for run in p.findall(_q("run"))
                     for tbl in run.findall(_q("tbl"))]
             pics = [pic for run in p.findall(_q("run"))
                     for pic in run.findall(_q("pic"))]
+            current_idx = p_idx
+            p_idx += 1
             if tbls or pics:
                 for tbl in tbls:
                     for tr in tbl.findall(_q("tr")):
@@ -119,7 +122,7 @@ def extract_slots(path):
                 continue
             text = _para_direct_text(p)
             if text:
-                slots.append({"key": f"p:{p_idx}", "type": "paragraph",
+                slots.append({"key": f"p:{current_idx}", "type": "paragraph",
                               "section": name, "text": text})
     return {"slots": slots}
 
