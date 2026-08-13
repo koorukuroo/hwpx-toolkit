@@ -36,8 +36,10 @@ def _table_rows(tbl_el):
 
 
 def _sections(pkg):
-    names = sorted(n for n in pkg.names()
-                   if re.fullmatch(r"Contents/section\d+\.xml", n))
+    candidates = [(n, int(m.group(1)))
+                  for n in pkg.names()
+                  if (m := re.fullmatch(r"Contents/section(\d+)\.xml", n))]
+    names = [n for n, _ in sorted(candidates, key=lambda x: x[1])]
     return [(n, ET.fromstring(pkg.read(n))) for n in names]
 
 
