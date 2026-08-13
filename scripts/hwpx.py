@@ -7,13 +7,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core import guards  # noqa: E402
+from core import analyze, guards  # noqa: E402
 
 
 def cmd_validate(args):
     result = guards.validate_package(args.file)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["ok"] else 2
+
+
+def cmd_extract(args):
+    print(analyze.extract_text(args.file, fmt=args.format))
+    return 0
 
 
 def build_parser():
@@ -23,6 +28,12 @@ def build_parser():
     v = sub.add_parser("validate", help="HWPX 구조 검증")
     v.add_argument("file")
     v.set_defaults(func=cmd_validate)
+
+    e = sub.add_parser("extract", help="텍스트 추출")
+    e.add_argument("file")
+    e.add_argument("--format", choices=["text", "markdown"], default="text")
+    e.set_defaults(func=cmd_extract)
+
     return p
 
 
