@@ -6,7 +6,7 @@
 - 원본 바이트 보존 편집 (변경 엔트리 외 바이트 동일)
 - 전달 전 필수 검증 게이트
 
-## 사용법 (Phase 1)
+## 사용법
 
     python3 scripts/hwpx.py extract 문서.hwpx            # 텍스트 추출
     python3 scripts/hwpx.py extract 문서.hwpx --format markdown
@@ -14,6 +14,8 @@
     python3 scripts/hwpx.py validate 문서.hwpx           # 구조 검증
     python3 scripts/hwpx.py unpack 문서.hwpx ./out/      # ZIP 해체
     python3 scripts/hwpx.py pack ./out/ 결과.hwpx --source 문서.hwpx
+    python3 scripts/hwpx.py new 문서.md -o 문서.hwpx              # 마크다운 → HWPX
+    python3 scripts/hwpx.py build --section sec.xml -o 문서.hwpx  # 직접 조립
 
 ## 개발
 

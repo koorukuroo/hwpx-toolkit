@@ -17,6 +17,7 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
      ├─ "읽어줘/내용 알려줘" → extract
      ├─ "구조 분석/어떤 양식인지" → analyze
      ├─ "편집할 곳 찾아줘" → analyze --slots
+     ├─ "새 문서 만들어줘" (마크다운/텍스트 콘텐츠) → new ★
      ├─ "파일이 정상인지 확인" → validate
      ├─ "XML 직접 보기/고치기" → unpack → (편집) → pack --source
      └─ .hwp 파일 → 미지원 안내 (한글에서 .hwpx로 저장 요청)
@@ -28,6 +29,10 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" validate 문서.hwpx
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" unpack 문서.hwpx ./작업디렉토리/
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" pack ./작업디렉토리/ 결과.hwpx --source 문서.hwpx
+    # 생성: 마크다운 → HWPX (제목/표/목록 지원; 강조 문법은 제거됨)
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx [--title 제목]
+    # 생성: section0.xml 직접 조립 (스타일 ID는 references/base-template-styles.md)
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" build --section sec.xml -o 결과.hwpx
 
 ## 필수 규칙
 
@@ -39,6 +44,11 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
    `<hp:t>` 내부 자식 태그(hp:fwSpace 등)를 삭제하지 않는다.
 4. .hwp(구형 바이너리)는 읽기·편집·변환 모두 미지원. 한글에서
    "다른 이름으로 저장 → HWPX"를 안내한다.
+5. new/build는 validate를 자동 실행한다. 출력 JSON의 ok가 false면 산출물을
+   사용자에게 전달하지 않는다.
+6. 마크다운 지원 범위: #~###### 제목, -/* 불릿, 1. 순서 목록, GitHub 표,
+   빈 줄 구분 문단. **강조**와 `코드`는 마커만 제거된다. 이 밖의 문법은
+   일반 텍스트로 들어간다.
 
 ## 포맷 상세
 
