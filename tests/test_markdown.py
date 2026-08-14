@@ -58,3 +58,33 @@ def test_multiline_paragraph_joined():
     blocks = parse_markdown("한 줄\n둘째 줄\n\n새 문단")
     assert blocks[0]["text"] == "한 줄 둘째 줄"
     assert blocks[1]["text"] == "새 문단"
+
+
+def test_table_short_row_padded(tmp_path):
+    md = """| 항목 | 예산 |
+| --- | --- |
+| 인건비 | 100 |
+| 운영비 |
+"""
+    blocks = parse_markdown(md)
+    assert blocks[0]["rows"] == [["항목", "예산"], ["인건비", "100"],
+                                 ["운영비", ""]]
+    xml = render_to_section(md)
+    out = build_from_template(tmp_path / "short.hwpx", section_xml=xml)
+    r = validate_package(out)
+    assert r["ok"], r["errors"]
+
+
+def test_table_long_row_truncated(tmp_path):
+    md = """| 항목 | 예산 |
+| --- | --- |
+| 인건비 | 100 | 초과 |
+| 운영비 | 50 |
+"""
+    blocks = parse_markdown(md)
+    assert blocks[0]["rows"] == [["항목", "예산"], ["인건비", "100"],
+                                 ["운영비", "50"]]
+    xml = render_to_section(md)
+    out = build_from_template(tmp_path / "long.hwpx", section_xml=xml)
+    r = validate_package(out)
+    assert r["ok"], r["errors"]

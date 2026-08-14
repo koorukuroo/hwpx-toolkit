@@ -47,11 +47,19 @@ def parse_markdown(text):
         if _TABLE_ROW_RE.match(stripped) and i + 1 < len(lines) \
                 and _TABLE_SEP_RE.match(lines[i + 1].strip()):
             flush_para()
-            rows = [_split_table_row(stripped)]
+            header = _split_table_row(stripped)
+            ncols = len(header)
+            rows = [header]
             i += 2
             while i < len(lines) and _TABLE_ROW_RE.match(lines[i].strip()):
                 rows.append(_split_table_row(lines[i].strip()))
                 i += 1
+            # GFM-style normalization: pad/truncate data rows to header width
+            # so a stray missing/extra pipe never reaches owpml.table as
+            # ragged input.
+            rows = [row + [""] * (ncols - len(row)) if len(row) < ncols
+                    else row[:ncols]
+                    for row in rows]
             rows = [[_clean_inline(c) for c in row] for row in rows]
             blocks.append({"type": "table", "rows": rows})
             continue
