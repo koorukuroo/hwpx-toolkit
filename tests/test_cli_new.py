@@ -50,3 +50,21 @@ def test_new_missing_input_returns_2(tmp_path, capsys):
                         "-o", str(tmp_path / "o.hwpx")])
     payload = json.loads(capsys.readouterr().out)
     assert rc == 2 and payload["ok"] is False
+
+
+def test_new_non_utf8_input_returns_2(tmp_path, capsys):
+    bad = tmp_path / "cp949.md"
+    bad.write_bytes("# 제목\n한글".encode("cp949"))
+    out = tmp_path / "out.hwpx"
+    rc = hwpx_cli.main(["new", str(bad), "-o", str(out)])
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 2 and payload["ok"] is False
+
+
+def test_build_non_utf8_section_returns_2(tmp_path, capsys):
+    bad = tmp_path / "cp949.xml"
+    bad.write_bytes("한글 섹션".encode("cp949"))
+    out = tmp_path / "out.hwpx"
+    rc = hwpx_cli.main(["build", "--section", str(bad), "-o", str(out)])
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 2 and payload["ok"] is False

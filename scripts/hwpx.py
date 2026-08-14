@@ -53,11 +53,20 @@ def _finish_generated(out_path):
     return 0 if result["ok"] else 2
 
 
+def _read_text_utf8(path):
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        raise PackageError(
+            f"UTF-8이 아닌 입력 파일 (CP949/EUC-KR 등): {path} — "
+            "UTF-8로 저장 후 다시 시도") from e
+
+
 def cmd_new(args):
     src = Path(args.input)
     if not src.is_file():
         raise PackageError(f"입력 파일 없음: {src}")
-    text = src.read_text(encoding="utf-8")
+    text = _read_text_utf8(src)
     title = args.title or md_mod.first_heading(text) or src.stem
     section = md_mod.render_to_section(text, template=args.template)
     build_from_template(args.output, template=args.template,
@@ -66,8 +75,7 @@ def cmd_new(args):
 
 
 def cmd_build(args):
-    section = Path(args.section).read_text(encoding="utf-8") \
-        if args.section else None
+    section = _read_text_utf8(args.section) if args.section else None
     build_from_template(args.output, template=args.template,
                         section_xml=section, title=args.title)
     return _finish_generated(args.output)
