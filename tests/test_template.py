@@ -1,7 +1,9 @@
+import shutil
 import zipfile
 import pytest
 from core.guards import validate_package
 from core.package import PackageError
+from core import template as template_mod
 from core.template import build_from_template
 
 
@@ -40,3 +42,29 @@ def test_section_override(tmp_path):
 def test_unknown_template_raises(tmp_path):
     with pytest.raises(PackageError):
         build_from_template(tmp_path / "x.hwpx", template="없는템플릿")
+
+
+def test_stray_dotfiles_excluded_from_package(tmp_path, monkeypatch):
+    templates_root = tmp_path / "templates"
+    shutil.copytree(template_mod.TEMPLATES_DIR / "base", templates_root / "base")
+    # Finder가 흘리는 .DS_Store 등 숨김 파일을 템플릿 트리 곳곳에 시뮬레이션
+    (templates_root / "base" / ".DS_Store").write_bytes(b"junk")
+    (templates_root / "base" / "Contents" / ".DS_Store").write_bytes(b"junk")
+    monkeypatch.setattr(template_mod, "TEMPLATES_DIR", templates_root)
+
+    out = build_from_template(tmp_path / "doc.hwpx")
+    with zipfile.ZipFile(out) as zf:
+        names = zf.namelist()
+    assert not any(".DS_Store" in n for n in names)
+    r = validate_package(out)
+    assert r["ok"], r["errors"]
+
+
+def test_missing_content_hpf_raises_package_error(tmp_path, monkeypatch):
+    templates_root = tmp_path / "templates_no_hpf"
+    shutil.copytree(template_mod.TEMPLATES_DIR / "base", templates_root / "base")
+    (templates_root / "base" / "Contents" / "content.hpf").unlink()
+    monkeypatch.setattr(template_mod, "TEMPLATES_DIR", templates_root)
+
+    with pytest.raises(PackageError):
+        build_from_template(tmp_path / "doc.hwpx", title="x")

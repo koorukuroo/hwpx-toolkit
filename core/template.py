@@ -26,11 +26,17 @@ def build_from_template(dst, *, template="base", section_xml=None, title=None):
         raise PackageError(f"템플릿 없음: {template}")
     files = {}
     for f in tdir.rglob("*"):
-        if f.is_file():
-            files[str(f.relative_to(tdir)).replace("\\", "/")] = f.read_bytes()
+        if not f.is_file():
+            continue
+        rel = f.relative_to(tdir)
+        if any(part.startswith(".") for part in rel.parts):
+            continue  # .DS_Store 등 숨김/메타 파일은 패키지에서 제외
+        files[str(rel).replace("\\", "/")] = f.read_bytes()
     if section_xml is not None:
         files["Contents/section0.xml"] = section_xml.encode("utf-8")
     if title is not None:
+        if "Contents/content.hpf" not in files:
+            raise PackageError(f"템플릿에 content.hpf 없음: {template}")
         hpf = files["Contents/content.hpf"].decode("utf-8")
         files["Contents/content.hpf"] = hpf.replace(
             "<opf:title>무제</opf:title>",

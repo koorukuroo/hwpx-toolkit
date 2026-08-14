@@ -15,7 +15,7 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물로, 구조 검증(vali
    - [ ] 본문이 10pt 바탕, 양쪽 정렬로 보이는가
    - [ ] 표의 테두리와 헤더 행 회색 배경이 보이는가
    - [ ] 편집(타이핑) 후 저장이 정상 동작하는가
-4. 편집 후 저장한 파일을 `python3 scripts/hwpx.py validate`로 재검증한다.
+4. 편집 후 저장한 파일을 `python3 scripts/hwpx.py validate verify.hwpx`로 재검증한다.
 
 ## 실패 시
 
