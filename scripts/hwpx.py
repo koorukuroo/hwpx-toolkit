@@ -9,7 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import analyze, guards  # noqa: E402
+from core import markdown as md_mod  # noqa: E402
 from core.package import HwpxPackage, PackageError, pack_dir  # noqa: E402
+from core.template import build_from_template  # noqa: E402
 
 
 def cmd_validate(args):
@@ -44,6 +46,33 @@ def cmd_pack(args):
     return 0
 
 
+def _finish_generated(out_path):
+    result = guards.validate_package(out_path)
+    payload = {"ok": result["ok"], "output": str(out_path), "validate": result}
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0 if result["ok"] else 2
+
+
+def cmd_new(args):
+    src = Path(args.input)
+    if not src.is_file():
+        raise PackageError(f"입력 파일 없음: {src}")
+    text = src.read_text(encoding="utf-8")
+    title = args.title or md_mod.first_heading(text) or src.stem
+    section = md_mod.render_to_section(text, template=args.template)
+    build_from_template(args.output, template=args.template,
+                        section_xml=section, title=title)
+    return _finish_generated(args.output)
+
+
+def cmd_build(args):
+    section = Path(args.section).read_text(encoding="utf-8") \
+        if args.section else None
+    build_from_template(args.output, template=args.template,
+                        section_xml=section, title=args.title)
+    return _finish_generated(args.output)
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="hwpx")
     sub = p.add_subparsers(dest="command", required=True)
@@ -72,6 +101,20 @@ def build_parser():
     k.add_argument("out")
     k.add_argument("--source", help="바이트 보존 기준이 될 원본 HWPX")
     k.set_defaults(func=cmd_pack)
+
+    n = sub.add_parser("new", help="마크다운 → HWPX 생성")
+    n.add_argument("input")
+    n.add_argument("-o", "--output", required=True)
+    n.add_argument("--template", default="base")
+    n.add_argument("--title")
+    n.set_defaults(func=cmd_new)
+
+    b = sub.add_parser("build", help="header+section 조립")
+    b.add_argument("--section")
+    b.add_argument("-o", "--output", required=True)
+    b.add_argument("--template", default="base")
+    b.add_argument("--title")
+    b.set_defaults(func=cmd_build)
 
     return p
 
