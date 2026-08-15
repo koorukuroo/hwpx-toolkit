@@ -123,6 +123,58 @@ def extract_slots(path):
     return {"slots": slots}
 
 
+_CHECKBOX_RE = re.compile(r"□\s*(\S{1,10})")
+_PAREN_RE = re.compile(r"\(\s+\)")
+
+
+def _norm_label(s):
+    return re.sub(r"[\s:：()（）]", "", s)
+
+
+def fill_targets(path):
+    pkg = HwpxPackage.open(path)
+    targets = []
+    table_index = 0
+    for name, root in _sections(pkg):
+        for p in root.findall(_q("p")):
+            tbls = [tbl for run in p.findall(_q("run"))
+                    for tbl in run.findall(_q("tbl"))]
+            if tbls:
+                for tbl in tbls:
+                    grid = {}
+                    for tc in tbl.iter(_q("tc")):
+                        addr = tc.find(_q("cellAddr"))
+                        r = int(addr.get("rowAddr"))
+                        c = int(addr.get("colAddr"))
+                        sub = tc.find(_q("subList"))
+                        cell_text = ""
+                        if sub is not None:
+                            cell_text = " ".join(
+                                _para_direct_text(cp)
+                                for cp in sub.findall(_q("p"))).strip()
+                        grid[(r, c)] = cell_text
+                    for (r, c), cell_text in sorted(grid.items()):
+                        if (cell_text and len(cell_text) <= 10
+                                and grid.get((r, c + 1)) == ""):
+                            targets.append({
+                                "key": _norm_label(cell_text),
+                                "kind": "label-cell", "label": cell_text,
+                                "table": table_index, "row": r, "col": c + 1})
+                    table_index += 1
+                continue
+            text = _para_direct_text(p)
+            for m in _CHECKBOX_RE.finditer(text):
+                targets.append({"key": _norm_label(m.group(1)),
+                                "kind": "checkbox", "literal": m.group(0)})
+            for m in _PAREN_RE.finditer(text):
+                prefix = text[max(0, m.start() - 10):m.start()]
+                targets.append({"key": _norm_label(prefix),
+                                "kind": "paren", "prefix": prefix,
+                                "blank": m.group(0),
+                                "literal": prefix + m.group(0)})
+    return {"targets": targets}
+
+
 def extract_text(path, fmt="text"):
     pkg = HwpxPackage.open(path)
     lines = []

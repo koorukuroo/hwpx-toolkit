@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import analyze, guards  # noqa: E402
 from core import edit as edit_mod  # noqa: E402
+from core import fill as fill_mod  # noqa: E402
 from core import markdown as md_mod  # noqa: E402
 from core.package import HwpxPackage, PackageError, pack_dir  # noqa: E402
 from core.template import build_from_template  # noqa: E402
@@ -122,6 +123,25 @@ def cmd_add_para(args):
     return _finish_edited(args.dst, {"added_after": args.after})
 
 
+def cmd_fill(args):
+    if args.analyze:
+        result = analyze.fill_targets(args.src)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    if not args.dst:
+        raise PackageError("채우기에는 <dst> 인자가 필요합니다")
+    values = json.loads(_read_text_utf8(args.values)) if args.values else None
+    cells = json.loads(_read_text_utf8(args.cells)) if args.cells else None
+    if not values and not cells:
+        raise PackageError("--values 또는 --cells 중 하나는 필요합니다")
+    report = fill_mod.fill_file(args.src, args.dst, values=values, cells=cells)
+    gate = guards.validate_package(args.dst)   # Task 6에서 check로 교체
+    ok = gate["ok"] and not report["unmatched"]
+    print(json.dumps({"ok": ok, "output": args.dst, "report": report,
+                      "gate": gate}, ensure_ascii=False, indent=2))
+    return 0 if ok else 2
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="hwpx")
     sub = p.add_subparsers(dest="command", required=True)
@@ -200,6 +220,14 @@ def build_parser():
     ap.add_argument("--after", required=True)
     ap.add_argument("--text", required=True)
     ap.set_defaults(func=cmd_add_para)
+
+    f = sub.add_parser("fill", help="양식 필드 채우기")
+    f.add_argument("src")
+    f.add_argument("dst", nargs="?")
+    f.add_argument("--analyze", action="store_true", help="채울 타겟만 출력")
+    f.add_argument("--values", help='{"라벨": "값"} JSON 파일')
+    f.add_argument("--cells", help='[{"table","row","col","value"}] JSON 파일')
+    f.set_defaults(func=cmd_fill)
 
     return p
 
