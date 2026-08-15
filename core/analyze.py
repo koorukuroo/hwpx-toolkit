@@ -86,9 +86,9 @@ def analyze_document(path):
 def extract_slots(path):
     pkg = HwpxPackage.open(path)
     slots = []
-    table_index = 0
     p_idx = 0
     for name, root in _sections(pkg):
+        table_index = 0  # 표 번호는 섹션마다 리셋 (core.edit.SectionEditor와 정렬)
         for p in root.findall(_q("p")):
             tbls = [tbl for run in p.findall(_q("run"))
                     for tbl in run.findall(_q("tbl"))]
@@ -112,6 +112,7 @@ def extract_slots(path):
                                 "key": f"cell:{table_index}:{row}:{col}",
                                 "type": "cell", "table": table_index,
                                 "row": row, "col": col,
+                                "section": name,
                                 "text": " ".join(t for t in texts if t),
                             })
                     table_index += 1
@@ -131,23 +132,25 @@ def _norm_label(s):
     return re.sub(r"[\s:：()（）]", "", s)
 
 
-def _scan_checkbox_paren(text, targets):
+def _scan_checkbox_paren(text, targets, section):
     for m in _CHECKBOX_RE.finditer(text):
         targets.append({"key": _norm_label(m.group(1)),
-                        "kind": "checkbox", "literal": m.group(0)})
+                        "kind": "checkbox", "literal": m.group(0),
+                        "section": section})
     for m in _PAREN_RE.finditer(text):
         prefix = text[max(0, m.start() - 10):m.start()]
         targets.append({"key": _norm_label(prefix),
                         "kind": "paren", "prefix": prefix,
                         "blank": m.group(0),
-                        "literal": prefix + m.group(0)})
+                        "literal": prefix + m.group(0),
+                        "section": section})
 
 
 def fill_targets(path):
     pkg = HwpxPackage.open(path)
     targets = []
-    table_index = 0
     for name, root in _sections(pkg):
+        table_index = 0  # 표 번호는 섹션마다 리셋 (core.edit.SectionEditor와 정렬)
         for p in root.findall(_q("p")):
             tbls = [tbl for run in p.findall(_q("run"))
                     for tbl in run.findall(_q("tbl"))]
@@ -171,13 +174,14 @@ def fill_targets(path):
                             targets.append({
                                 "key": _norm_label(cell_text),
                                 "kind": "label-cell", "label": cell_text,
-                                "table": table_index, "row": r, "col": c + 1})
+                                "table": table_index, "row": r, "col": c + 1,
+                                "section": name})
                         # 셀 내부 문단도 checkbox/paren 스캔 대상에 포함
-                        _scan_checkbox_paren(cell_text, targets)
+                        _scan_checkbox_paren(cell_text, targets, name)
                     table_index += 1
                 continue
             text = _para_direct_text(p)
-            _scan_checkbox_paren(text, targets)
+            _scan_checkbox_paren(text, targets, name)
     return {"targets": targets}
 
 

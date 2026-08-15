@@ -73,7 +73,8 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
    매핑한 values.json 작성 → ③ `fill --values` 실행 → unmatched가 비어야 완료.
    v1 한계: 체크박스/괄호 채우기는 리터럴 문자열 매칭이라 동일 리터럴이
    문서 내 여러 곳에 있으면 모두 함께 바뀐다 — 문서에서 유일한 리터럴인지
-   analyze --slots로 먼저 확인한다.
+   analyze --slots로 먼저 확인한다. 중첩 표 내부 셀과 section0 외 섹션의
+   타겟은 v1에서 편집 미지원(unmatched 처리).
 
 ## 포맷 상세
 

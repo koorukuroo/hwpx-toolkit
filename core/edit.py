@@ -61,6 +61,8 @@ class SectionEditor:
     def replace_text(self, mapping):
         report = {"replaced": {}, "not_found": []}
         for old, new in mapping.items():
+            if not old:
+                raise EditError("빈 문자열은 교체 대상이 될 수 없음")
             total = 0
             for p in self._paras():
                 ts = self._direct_ts(p)
@@ -101,7 +103,12 @@ class SectionEditor:
 
     # ---- 표 탐색 ----
     def _tables(self):
-        return list(self.root.iter(_q("tbl")))
+        # 최상위(문단 직속) 표만 문서 순서대로 나열한다 — core.analyze의
+        # fill_targets/extract_slots와 번호 체계를 맞추기 위함. 셀 내부에
+        # 중첩된 표는 인덱스로 접근할 수 없다(v1 미지원, 의도된 동작).
+        return [tbl for p in self.root.findall(_q("p"))
+                for run in p.findall(_q("run"))
+                for tbl in run.findall(_q("tbl"))]
 
     def _get_table(self, table_index):
         tbls = self._tables()

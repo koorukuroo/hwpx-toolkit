@@ -57,6 +57,12 @@ def test_replace_not_found_reported(tmp_path):
     assert report["not_found"] == ["없는문구"]
 
 
+def test_replace_empty_old_raises(tmp_path):
+    src = build_form_hwpx(tmp_path / "form.hwpx")
+    with pytest.raises(EditError):
+        edit_file(src, tmp_path / "x.hwpx", lambda ed: ed.replace_text({"": "x"}))
+
+
 def test_replace_multiple_occurrences_and_self_containing(tmp_path):
     src = build_minimal_hwpx(tmp_path / "a.hwpx",
                              body_texts=["가나다 가나다", "가나다"])

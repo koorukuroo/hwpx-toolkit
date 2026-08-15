@@ -23,6 +23,9 @@ def _find_target(nk, targets):
     return None
 
 
+_EDITABLE_SECTION = "Contents/section0.xml"
+
+
 def fill_file(src, dst, values=None, cells=None):
     values = values or {}
     cells = cells or []
@@ -33,29 +36,44 @@ def fill_file(src, dst, values=None, cells=None):
     for key, val in values.items():
         nk = analyze._norm_label(key)
         tgt = _find_target(nk, targets)
-        if tgt is None:
+        # section0 외 섹션의 타겟은 v1 미지원(멀티섹션 편집은 Phase 4) —
+        # 매칭되더라도 적용하지 않고 unmatched로 보고한다.
+        if tgt is None or tgt.get("section") != _EDITABLE_SECTION:
             unmatched.append(key)
         else:
             plan.append((key, tgt, val))
 
+    filled = []
+    skipped = []
+
     def apply(ed):
-        filled = []
         for key, tgt, val in plan:
             if tgt["kind"] == "label-cell":
                 ed.set_cell_text(tgt["table"], tgt["row"], tgt["col"], str(val))
+                filled.append(key)
             elif tgt["kind"] == "checkbox":
-                if val:
-                    ed.replace_text(
-                        {tgt["literal"]: tgt["literal"].replace("□", "☑", 1)})
+                if not val:
+                    # falsy 체크박스 값은 편집을 수행하지 않음 — filled로 보고하지 않는다.
+                    skipped.append(key)
+                    continue
+                rep = ed.replace_text(
+                    {tgt["literal"]: tgt["literal"].replace("□", "☑", 1)})
+                if rep["replaced"][tgt["literal"]] > 0:
+                    filled.append(key)
+                else:
+                    unmatched.append(key)
             elif tgt["kind"] == "paren":
-                ed.replace_text(
+                rep = ed.replace_text(
                     {tgt["literal"]: tgt["prefix"] + "(" + str(val) + ")"})
-            filled.append(key)
+                if rep["replaced"][tgt["literal"]] > 0:
+                    filled.append(key)
+                else:
+                    unmatched.append(key)
         for spec in cells:
             ed.set_cell_text(spec["table"], spec["row"], spec["col"],
                              str(spec["value"]))
             filled.append(f"cell:{spec['table']}:{spec['row']}:{spec['col']}")
         return filled
 
-    filled = edit_file(src, dst, apply)
-    return {"filled": filled, "unmatched": unmatched}
+    edit_file(src, dst, apply)
+    return {"filled": filled, "unmatched": unmatched, "skipped": skipped}
