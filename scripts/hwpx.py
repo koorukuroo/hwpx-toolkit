@@ -142,6 +142,28 @@ def cmd_fill(args):
     return 0 if ok else 2
 
 
+def _target_kwargs(args):
+    return {"after": args.after, "index": args.para}
+
+
+def cmd_set_text_style(args):
+    kw = dict(bold=True if args.bold else None, italic=True if args.italic else None,
+              underline=True if args.underline else None,
+              color=args.color, size_pt=args.size)
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.set_text_style(**_target_kwargs(args), **kw))
+    return _finish_edited(args.dst, {"set_text_style": kw})
+
+
+def cmd_set_para_style(args):
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.set_para_style(**_target_kwargs(args),
+                                                    align=args.align,
+                                                    line_spacing=args.line_spacing))
+    return _finish_edited(args.dst, {"set_para_style": {"align": args.align,
+                                                        "line_spacing": args.line_spacing}})
+
+
 def cmd_check(args):
     result = guards.check_package(args.file)
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -242,6 +264,29 @@ def build_parser():
     f.add_argument("--values", help='{"라벨": "값"} JSON 파일')
     f.add_argument("--cells", help='[{"table","row","col","value"}] JSON 파일')
     f.set_defaults(func=cmd_fill)
+
+    def _add_target(parser):
+        parser.add_argument("--after", help="기준 문구를 포함한 본문 문단")
+        parser.add_argument("--para", type=int, help="본문 문단 인덱스 (음수=끝에서)")
+
+    ts = sub.add_parser("set-text-style", help="글자 서식 (대상 문단 전체 run)")
+    ts.add_argument("src")
+    ts.add_argument("dst")
+    _add_target(ts)
+    ts.add_argument("--bold", action="store_true")
+    ts.add_argument("--italic", action="store_true")
+    ts.add_argument("--underline", action="store_true")
+    ts.add_argument("--color", help="RRGGBB")
+    ts.add_argument("--size", type=float, help="pt")
+    ts.set_defaults(func=cmd_set_text_style)
+
+    ps = sub.add_parser("set-para-style", help="문단 서식")
+    ps.add_argument("src")
+    ps.add_argument("dst")
+    _add_target(ps)
+    ps.add_argument("--align", choices=["left", "center", "right", "justify"])
+    ps.add_argument("--line-spacing", type=int, help="%%")
+    ps.set_defaults(func=cmd_set_para_style)
 
     ck = sub.add_parser("check", help="전달 전 필수 게이트 (validate + 사고 패턴)")
     ck.add_argument("file")

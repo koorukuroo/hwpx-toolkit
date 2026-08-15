@@ -239,6 +239,66 @@ class SectionEditor:
             tblsz.set("height",
                       str(max(int(tblsz.get("height", "0")) - removed_h, 0)))
 
+    # ---- 대상 문단 선택 ----
+    def _body_paras(self):
+        parents = {c: par for par in self.root.iter() for c in par}
+        out = []
+        for p in self._paras():
+            node, in_cell = p, False
+            while node is not None:
+                node = parents.get(node)
+                if node is not None and node.tag == _q("subList"):
+                    in_cell = True
+                    break
+            if not in_cell:
+                out.append(p)
+        return out
+
+    def _target_para(self, after=None, index=None):
+        body = self._body_paras()
+        if not body:
+            raise EditError("본문 문단 없음")
+        if after is not None:
+            for p in body:
+                if after in self._para_text(p):
+                    return p
+            raise EditError(f"본문에서 기준 문구를 찾지 못함: {after}")
+        if index is None:
+            index = -1
+        try:
+            return body[index]
+        except IndexError:
+            raise EditError(f"문단 인덱스 범위 밖: {index}")
+
+    def _require_header(self):
+        if self.ctx is None or self.ctx.header is None:
+            raise EditError("헤더 편집기 없음 — edit_file 경유 필요")
+        return self.ctx.header
+
+    # ---- 서식 ----
+    def set_text_style(self, *, after=None, index=None, bold=None, italic=None,
+                       underline=None, color=None, size_pt=None):
+        he = self._require_header()
+        p = self._target_para(after, index)
+        cache = {}
+        for run in p.findall(_q("run")):
+            base = run.get("charPrIDRef", "0")
+            if base not in cache:
+                cache[base] = he.clone_char_pr(base, bold=bold, italic=italic,
+                                               underline=underline, color=color,
+                                               size_pt=size_pt)
+            run.set("charPrIDRef", cache[base])
+        self._mark(p)
+
+    def set_para_style(self, *, after=None, index=None, align=None,
+                       line_spacing=None):
+        he = self._require_header()
+        p = self._target_para(after, index)
+        new_id = he.clone_para_pr(p.get("paraPrIDRef", "0"), align=align,
+                                  line_spacing=line_spacing)
+        p.set("paraPrIDRef", new_id)
+        self._mark(p)
+
     # ---- 문단 추가 ----
     def add_para_after(self, anchor_text, text):
         parents = {c: par for par in self.root.iter() for c in par}
@@ -293,9 +353,11 @@ class SectionEditor:
 
 
 def edit_file(src, dst, fn, section="Contents/section0.xml"):
+    from core.header import HeaderEditor  # 순환 import 회피 (header→edit 의존)
     pkg = HwpxPackage.open(src)
     editor = SectionEditor.from_package(pkg, section)
     ctx = EditContext(pkg, editor)
+    ctx.header = HeaderEditor.from_package(pkg)
     editor.ctx = ctx
     result = fn(editor)
     replacements = {section: editor.serialize()}
