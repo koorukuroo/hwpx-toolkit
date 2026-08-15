@@ -2,7 +2,7 @@
 import re
 import xml.etree.ElementTree as ET
 
-from core.package import HwpxPackage
+from core.package import HwpxPackage, section_names
 
 NS_HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 
@@ -36,11 +36,7 @@ def _table_rows(tbl_el):
 
 
 def _sections(pkg):
-    candidates = [(n, int(m.group(1)))
-                  for n in pkg.names()
-                  if (m := re.fullmatch(r"Contents/section(\d+)\.xml", n))]
-    names = [n for n, _ in sorted(candidates, key=lambda x: x[1])]
-    return [(n, ET.fromstring(pkg.read(n))) for n in names]
+    return [(n, ET.fromstring(pkg.read(n))) for n in section_names(pkg.names())]
 
 
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"

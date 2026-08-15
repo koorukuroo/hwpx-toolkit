@@ -3,7 +3,7 @@ import re
 import zipfile
 import xml.etree.ElementTree as ET
 
-from core.package import HwpxPackage, PackageError
+from core.package import HwpxPackage, PackageError, section_names
 
 REQUIRED_ENTRIES = ("mimetype", "version.xml", "Contents/header.xml",
                     "Contents/content.hpf")
@@ -31,8 +31,7 @@ def validate_package(path):
     for req in REQUIRED_ENTRIES:
         if req not in names:
             errors.append(f"required-missing: {req}")
-    sections = sorted(n for n in names
-                      if re.fullmatch(r"Contents/section\d+\.xml", n))
+    sections = section_names(names)
     if not sections:
         errors.append("required-missing: Contents/section*.xml")
 

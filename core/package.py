@@ -1,5 +1,6 @@
 """HWPX ZIP 패키지 IO — 읽기 + 바이트 보존 쓰기 (순수 stdlib)."""
 import io
+import re
 import struct
 import zipfile
 import zlib
@@ -53,6 +54,16 @@ def _local_record_span(data, info):
     return off, data_start, data_start + info.compress_size
 
 
+def section_names(names):
+    """Contents/section<N>.xml 엔트리를 숫자순으로 반환."""
+    cands = []
+    for n in names:
+        m = re.fullmatch(r"Contents/section(\d+)\.xml", n)
+        if m:
+            cands.append((int(m.group(1)), n))
+    return [n for _, n in sorted(cands)]
+
+
 class HwpxPackage:
     def __init__(self, path, data, zf):
         self.path = Path(path)
@@ -69,7 +80,10 @@ class HwpxPackage:
             raise PackageError(f"파일을 읽을 수 없음: {path}: {e}") from e
         if not zipfile.is_zipfile(io.BytesIO(data)):
             raise PackageError(f"ZIP 형식이 아님: {path}")
-        zf = zipfile.ZipFile(io.BytesIO(data))
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(data))
+        except zipfile.BadZipFile as e:
+            raise PackageError(f"ZIP 손상: {path}: {e}") from e
         return cls(path, data, zf)
 
     def names(self):
@@ -144,8 +158,14 @@ class HwpxPackage:
 
 def pack_dir(dirpath, dst, source=None):
     dirpath = Path(dirpath)
-    files = {str(f.relative_to(dirpath)).replace("\\", "/"): f
-             for f in dirpath.rglob("*") if f.is_file()}
+    files = {}
+    for f in dirpath.rglob("*"):
+        if not f.is_file():
+            continue
+        rel = f.relative_to(dirpath)
+        if any(part.startswith(".") for part in rel.parts):
+            continue
+        files[str(rel).replace("\\", "/")] = f
     if source is not None:
         pkg = HwpxPackage.open(source)
         src_names = set(pkg.names())
