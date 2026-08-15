@@ -18,6 +18,9 @@
     python3 scripts/hwpx.py build --section sec.xml -o 문서.hwpx  # 직접 조립
     python3 scripts/hwpx.py replace 원본.hwpx 결과.hwpx --map map.json   # 문구 교체
     python3 scripts/hwpx.py fill 양식.hwpx 결과.hwpx --values values.json # 양식 채우기
+    python3 scripts/hwpx.py set-text-style 원본.hwpx 결과.hwpx --after "제목" --bold --size 16
+    python3 scripts/hwpx.py insert-image 원본.hwpx 결과.hwpx --image 그림.png --after "그림 위치" --width-mm 80
+    python3 scripts/hwpx.py set-header 원본.hwpx 결과.hwpx --text "대외비" --align center
     python3 scripts/hwpx.py check 결과.hwpx                               # 전달 전 게이트
 
 ## 개발

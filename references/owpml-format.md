@@ -46,3 +46,15 @@
    pretty-print 금지, 자식 태그 삭제 금지.
 7. `hp:linesegarray`는 한컴의 줄 배치 캐시 — 텍스트 수정 시 해당 문단 것을 제거해야
    손상 경고를 피한다 (Phase 3 edit에서 구현).
+
+## 개체 구조 노트 (Phase 4)
+
+- **그림**: `hp:p > hp:run > hp:pic` (offset/orgSz/curSz/flip/rotationInfo/renderingInfo/
+  imgRect/imgClip/inMargin/imgDim/hc:img@binaryItemIDRef/effects/sz/pos/outMargin).
+  바이너리는 `BinData/imageN.ext`, content.hpf manifest에 `opf:item id="imageN"
+  isEmbeded="1"`로 등록. (2026-08-15 한컴 실물에서 확인)
+- **머리말/꼬리말**: 첫 문단 첫 run, secPr·colPr ctrl 뒤 `hp:ctrl > hp:header|hp:footer
+  @applyPageType > hp:subList > hp:p`. 쪽번호는 그 문단의 run에 `hp:autoNum
+  @numType="PAGE"`. (표준 구조 — 실물 검증 대기)
+- **스타일 추가**: header.xml의 charPr/paraPr를 복제·변형해 끝에 추가하고 itemCnt 갱신.
+  기존 id는 절대 재사용하지 않는다.

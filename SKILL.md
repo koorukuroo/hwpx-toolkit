@@ -20,6 +20,11 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
      ├─ "문구 바꿔줘" → replace → (자동 check)
      ├─ "양식 빈칸 채워줘" → fill --analyze → values.json 작성 → fill → (자동 check)
      ├─ "표에 행 추가/삭제, 셀 수정" → add-row / del-row / set-cell
+     ├─ "셀 병합/열 추가" → merge-cells / add-col
+     ├─ "글자/문단 서식 바꿔줘" → set-text-style / set-para-style
+     ├─ "머리말/꼬리말/쪽번호" → set-header / set-footer / remove-header / remove-footer / set-pagenum
+     ├─ "가로/용지/여백/다단/쪽나누기" → set-page / set-columns / page-break
+     ├─ "이미지 넣어줘/바꿔줘" → insert-image / list-images / resize-image / replace-image / delete-image
      ├─ "문단 추가" → add-para
      ├─ "파일 정상 확인" → check (편집 후엔 guard --reference 원본 병행)
      ├─ "XML 직접 수정" → unpack → 편집 → pack --source
@@ -43,6 +48,23 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-cell 원본.hwpx 결과.hwpx --table 0 --row 1 --col 1 --text "값"
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" add-row 원본.hwpx 결과.hwpx --table 0 --cells cells.json
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" del-row 원본.hwpx 결과.hwpx --table 0 --row 2
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" merge-cells 원본.hwpx 결과.hwpx --table 0 --row 0 --col 0 --row2 1 --col2 1
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" add-col 원본.hwpx 결과.hwpx --table 0 --cells cells.json
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-text-style 원본.hwpx 결과.hwpx --after "제목" --bold --size 16
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-para-style 원본.hwpx 결과.hwpx --after "제목" --align center
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-header 원본.hwpx 결과.hwpx --text "대외비" --align center
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-footer 원본.hwpx 결과.hwpx --text "기밀" --align right
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" remove-header 원본.hwpx 결과.hwpx
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" remove-footer 원본.hwpx 결과.hwpx
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-pagenum 원본.hwpx 결과.hwpx --where footer --align center
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-page 원본.hwpx 결과.hwpx --orientation landscape --margin-mm 20
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" set-columns 원본.hwpx 결과.hwpx --count 2 --gap-mm 10
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" page-break 원본.hwpx 결과.hwpx --after "절 제목"
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" insert-image 원본.hwpx 결과.hwpx --image 그림.png --after "그림 위치" --width-mm 80
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" list-images 원본.hwpx
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" resize-image 원본.hwpx 결과.hwpx --index 0 --width-mm 100
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" replace-image 원본.hwpx 결과.hwpx --index 0 --image 새그림.png
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" delete-image 원본.hwpx 결과.hwpx --index 0
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" add-para 원본.hwpx 결과.hwpx --after "기준 문구" --text "새 문단"
     # 게이트
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" check 결과.hwpx
@@ -75,6 +97,14 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
    문서 내 여러 곳에 있으면 모두 함께 바뀐다 — 문서에서 유일한 리터럴인지
    analyze --slots로 먼저 확인한다. 중첩 표 내부 셀과 section0 외 섹션의
    타겟은 v1에서 편집 미지원(unmatched 처리).
+10. 서식 커맨드(set-text-style/set-para-style)는 대상 문단(--after 문구 | --para N)
+    만 바꾼다. header.xml에 새 스타일이 추가되고 다른 문단은 영향 없다.
+    스타일을 안 건드린 편집은 header.xml이 바이트 동일하게 유지된다.
+11. 이미지는 PNG/JPEG만. 크기 미지정 시 96dpi 환산, 한쪽만 주면 비율 유지.
+    replace-image는 기존 BinData를 남기고 새 항목을 추가한다.
+12. merge-cells/add-col도 병합 셀이 이미 있는 표에서는 거부된다. 머리말·꼬리말·
+    쪽번호 구조는 한컴 실물 검증이 아직 없으므로(docs/hancom-verification.md)
+    첫 사용 시 결과를 한컴에서 확인하도록 안내한다.
 
 ## 포맷 상세
 
