@@ -164,6 +164,53 @@ def cmd_set_para_style(args):
                                                         "line_spacing": args.line_spacing}})
 
 
+def cmd_set_page(args):
+    margins = None
+    if args.margin_mm is not None:
+        margins = {k: args.margin_mm for k in ("left", "right", "top", "bottom")}
+    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.set_page(
+        orientation=args.orientation, size=args.size, margins_mm=margins))
+    return _finish_edited(args.dst, {"set_page": {
+        "orientation": args.orientation, "size": args.size,
+        "margin_mm": args.margin_mm}})
+
+
+def cmd_set_columns(args):
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.set_columns(args.count, gap_mm=args.gap_mm))
+    return _finish_edited(args.dst, {"columns": args.count})
+
+
+def cmd_page_break(args):
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.set_page_break(args.after, on=not args.off))
+    return _finish_edited(args.dst, {"page_break": args.after, "on": not args.off})
+
+
+def _cmd_hf(kind):
+    def run(args):
+        edit_mod.edit_file(args.src, args.dst,
+                           lambda ed: ed.set_header_footer(kind, args.text,
+                                                           align=args.align))
+        return _finish_edited(args.dst, {kind: args.text})
+    return run
+
+
+def _cmd_remove_hf(kind):
+    def run(args):
+        edit_mod.edit_file(args.src, args.dst,
+                           lambda ed: ed.remove_header_footer(kind))
+        return _finish_edited(args.dst, {"removed": kind})
+    return run
+
+
+def cmd_set_pagenum(args):
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.set_page_number(where=args.where,
+                                                     align=args.align))
+    return _finish_edited(args.dst, {"pagenum": args.where})
+
+
 def cmd_check(args):
     result = guards.check_package(args.file)
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -287,6 +334,47 @@ def build_parser():
     ps.add_argument("--align", choices=["left", "center", "right", "justify"])
     ps.add_argument("--line-spacing", type=int, help="%%")
     ps.set_defaults(func=cmd_set_para_style)
+
+    pg = sub.add_parser("set-page", help="용지/방향/여백")
+    pg.add_argument("src")
+    pg.add_argument("dst")
+    pg.add_argument("--orientation", choices=["portrait", "landscape"])
+    pg.add_argument("--size", choices=["a4", "a3", "b5", "letter"])
+    pg.add_argument("--margin-mm", type=float, help="상하좌우 일괄")
+    pg.set_defaults(func=cmd_set_page)
+
+    cl = sub.add_parser("set-columns", help="다단")
+    cl.add_argument("src")
+    cl.add_argument("dst")
+    cl.add_argument("--count", type=int, required=True)
+    cl.add_argument("--gap-mm", type=float)
+    cl.set_defaults(func=cmd_set_columns)
+
+    pb = sub.add_parser("page-break", help="쪽 나누기 토글")
+    pb.add_argument("src")
+    pb.add_argument("dst")
+    pb.add_argument("--after", required=True)
+    pb.add_argument("--off", action="store_true")
+    pb.set_defaults(func=cmd_page_break)
+
+    for kind in ("header", "footer"):
+        s = sub.add_parser(f"set-{kind}", help=f"{kind} 설정/갱신")
+        s.add_argument("src")
+        s.add_argument("dst")
+        s.add_argument("--text", required=True)
+        s.add_argument("--align", choices=["left", "center", "right"])
+        s.set_defaults(func=_cmd_hf(kind))
+        rm = sub.add_parser(f"remove-{kind}", help=f"{kind} 제거")
+        rm.add_argument("src")
+        rm.add_argument("dst")
+        rm.set_defaults(func=_cmd_remove_hf(kind))
+
+    pn = sub.add_parser("set-pagenum", help="자동 쪽번호")
+    pn.add_argument("src")
+    pn.add_argument("dst")
+    pn.add_argument("--where", choices=["header", "footer"], default="footer")
+    pn.add_argument("--align", choices=["left", "center", "right"], default="center")
+    pn.set_defaults(func=cmd_set_pagenum)
 
     ck = sub.add_parser("check", help="전달 전 필수 게이트 (validate + 사고 패턴)")
     ck.add_argument("file")

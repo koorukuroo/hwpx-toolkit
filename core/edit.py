@@ -25,6 +25,14 @@ class EditError(PackageError):
     pass
 
 
+_PAGE_SIZES = {"a4": (59528, 84186), "a3": (84186, 119055),
+               "b5": (51023, 72283), "letter": (61199, 79370)}
+
+
+def _mm(v):
+    return str(int(round(float(v) * 283.5)))
+
+
 class EditContext:
     """섹션/헤더를 넘나드는 편집 세션 상태 — 추가 교체·신규 엔트리를 모은다."""
 
@@ -303,6 +311,147 @@ class SectionEditor:
                                   line_spacing=line_spacing)
         p.set("paraPrIDRef", new_id)
         self._mark(p)
+
+    # ---- 페이지 설정 ----
+    def _first_run(self):
+        p = self.root.find(_q("p"))
+        run = p.find(_q("run")) if p is not None else None
+        if run is None or run.find(_q("secPr")) is None:
+            raise EditError("첫 문단 첫 run에 secPr 없음")
+        return p, run
+
+    def set_page(self, *, orientation=None, size=None, margins_mm=None):
+        p, run = self._first_run()
+        pagepr = run.find(_q("secPr")).find(_q("pagePr"))
+        if pagepr is None:
+            raise EditError("pagePr 없음")
+        if size is not None:
+            if size.lower() not in _PAGE_SIZES:
+                raise EditError(f"지원하지 않는 용지: {size}")
+            w, h = _PAGE_SIZES[size.lower()]
+            pagepr.set("width", str(w))
+            pagepr.set("height", str(h))
+        if orientation is not None:
+            w, h = int(pagepr.get("width")), int(pagepr.get("height"))
+            if orientation == "landscape":
+                pagepr.set("landscape", "NARROWLY")
+                if w < h:
+                    pagepr.set("width", str(h))
+                    pagepr.set("height", str(w))
+            elif orientation == "portrait":
+                pagepr.set("landscape", "WIDELY")
+                if w > h:
+                    pagepr.set("width", str(h))
+                    pagepr.set("height", str(w))
+            else:
+                raise EditError(f"orientation 값 오류: {orientation}")
+        if margins_mm:
+            m = pagepr.find(_q("margin"))
+            if m is None:
+                raise EditError("margin 없음")
+            for k, v in margins_mm.items():
+                if k not in ("left", "right", "top", "bottom", "header",
+                             "footer", "gutter"):
+                    raise EditError(f"여백 키 오류: {k}")
+                m.set(k, _mm(v))
+        self._mark(p)
+
+    def set_columns(self, count, gap_mm=None):
+        p, run = self._first_run()
+        col = run.find(f"{_q('ctrl')}/{_q('colPr')}")
+        if col is None:
+            raise EditError("colPr 없음")
+        if int(count) < 1:
+            raise EditError("단 수는 1 이상")
+        col.set("colCount", str(int(count)))
+        if gap_mm is not None:
+            run.find(_q("secPr")).set("spaceColumns", _mm(gap_mm))
+        self._mark(p)
+
+    def set_page_break(self, after, on=True):
+        p = self._target_para(after=after)
+        p.set("pageBreak", "1" if on else "0")
+        self._mark(p)
+
+    _HF_KINDS = ("header", "footer")
+
+    def _find_hf(self, kind):
+        return list(self.root.iter(_q(kind)))
+
+    def _hf_para(self, hf):
+        return hf.find(f"{_q('subList')}/{_q('p')}")
+
+    def set_header_footer(self, kind, text, *, align=None):
+        if kind not in self._HF_KINDS:
+            raise EditError(f"kind는 header|footer: {kind}")
+        existing = self._find_hf(kind)
+        p0, run = self._first_run()
+        if existing:
+            hp = self._hf_para(existing[0])
+            ts = self._direct_ts(hp)
+            if not ts:
+                ET.SubElement(hp.find(_q("run")), _q("t"))
+                ts = self._direct_ts(hp)
+            ts[0].text = text
+            for t in ts[1:]:
+                t.text = ""
+            target_p = hp
+        else:
+            ctrl = ET.Element(_q("ctrl"))
+            hf = ET.SubElement(ctrl, _q(kind), {"id": "", "applyPageType": "BOTH"})
+            sub = ET.SubElement(hf, _q("subList"), {
+                "id": "", "textDirection": "HORIZONTAL", "lineWrap": "BREAK",
+                "vertAlign": "TOP" if kind == "header" else "BOTTOM",
+                "linkListIDRef": "0", "linkListNextIDRef": "0",
+                "textWidth": "0", "textHeight": "0", "hasTextRef": "0",
+                "hasNumRef": "0"})
+            hp = ET.SubElement(sub, _q("p"), {
+                "id": str(self._max_id() + 1), "paraPrIDRef": "0",
+                "styleIDRef": "0", "pageBreak": "0", "columnBreak": "0",
+                "merged": "0"})
+            r = ET.SubElement(hp, _q("run"), {"charPrIDRef": "0"})
+            t = ET.SubElement(r, _q("t"))
+            t.text = text
+            # secPr, colPr ctrl 뒤에 삽입
+            idx = max(i for i, c in enumerate(list(run))
+                      if c.tag in (_q("secPr"), _q("ctrl"))) + 1
+            run.insert(idx, ctrl)
+            target_p = hp
+        if align is not None:
+            he = self._require_header()
+            target_p.set("paraPrIDRef",
+                         he.clone_para_pr(target_p.get("paraPrIDRef", "0"),
+                                          align=align))
+        self._mark(p0)
+
+    def remove_header_footer(self, kind):
+        if kind not in self._HF_KINDS:
+            raise EditError(f"kind는 header|footer: {kind}")
+        p0, run = self._first_run()
+        removed = 0
+        for ctrl in list(run.findall(_q("ctrl"))):
+            if ctrl.find(_q(kind)) is not None:
+                run.remove(ctrl)
+                removed += 1
+        if not removed:
+            raise EditError(f"{kind} 없음")
+        self._mark(p0)
+
+    def set_page_number(self, *, where="footer", align="center"):
+        if where not in self._HF_KINDS:
+            raise EditError(f"where는 header|footer: {where}")
+        if not self._find_hf(where):
+            self.set_header_footer(where, "", align=align)
+        hf = self._find_hf(where)[0]
+        hp = self._hf_para(hf)
+        if hp.find(f".//{_q('autoNum')}") is not None:
+            return
+        r = ET.SubElement(hp, _q("run"), {"charPrIDRef": "0"})
+        auto = ET.SubElement(r, _q("autoNum"), {"num": "1", "numType": "PAGE"})
+        ET.SubElement(auto, _q("autoNumFormat"), {
+            "type": "DIGIT", "userChar": "", "prefixChar": "",
+            "suffixChar": "", "supscript": "0"})
+        self._mark(self._first_run()[0])
 
     # ---- 문단 추가 ----
     def add_para_after(self, anchor_text, text):

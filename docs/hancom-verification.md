@@ -18,6 +18,21 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
    - [ ] 편집(타이핑) 후 저장이 정상 동작하는가
 4. 편집 후 저장한 파일을 `python3 scripts/hwpx.py validate verify.hwpx`로 재검증한다.
 
+## Phase 4 추가 검증 항목 (구조 미확인 — 우선 확인 필요)
+
+머리말·꼬리말·쪽번호는 실물 샘플 없이 표준 구조로 작성했다. 아래를 한 번 확인한다.
+
+    python3 scripts/hwpx.py set-header 샘플.hwpx h.hwpx --text "대외비" --align center
+    python3 scripts/hwpx.py set-pagenum h.hwpx hp.hwpx --where footer
+
+- [ ] h.hwpx: 머리말 "대외비"가 각 쪽 상단 가운데에 보이는가
+- [ ] hp.hwpx: 꼬리말에 쪽번호가 보이는가
+- [ ] set-page --orientation landscape 산출물이 가로로 열리는가
+- [ ] set-text-style --bold --color C00000 산출물의 대상 문단만 붉은 굵은 글씨인가
+
+실패 시: 한컴에서 머리말을 넣고 저장한 .hwpx를 unpack해 `hp:header` 구조를
+비교하고 `SectionEditor.set_header_footer`를 보정한다.
+
 ## 실패 시
 
 - 대화상자 문구/증상을 기록해 이슈로 남긴다.
