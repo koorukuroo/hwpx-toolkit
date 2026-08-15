@@ -278,6 +278,9 @@ class SectionEditor:
     # ---- 서식 ----
     def set_text_style(self, *, after=None, index=None, bold=None, italic=None,
                        underline=None, color=None, size_pt=None):
+        if bold is None and italic is None and underline is None \
+                and color is None and size_pt is None:
+            raise EditError("변경할 서식 항목이 없음")
         he = self._require_header()
         p = self._target_para(after, index)
         cache = {}
@@ -292,6 +295,8 @@ class SectionEditor:
 
     def set_para_style(self, *, after=None, index=None, align=None,
                        line_spacing=None):
+        if align is None and line_spacing is None:
+            raise EditError("변경할 서식 항목이 없음")
         he = self._require_header()
         p = self._target_para(after, index)
         new_id = he.clone_para_pr(p.get("paraPrIDRef", "0"), align=align,

@@ -5,6 +5,7 @@ from core.package import HwpxPackage
 from core.edit import edit_file, EditError
 from core.header import HeaderEditor
 from core.guards import check_package
+from core.template import TEMPLATES_DIR
 from tests.fixture import build_form_hwpx, build_minimal_hwpx
 
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
@@ -79,3 +80,32 @@ def test_target_para_index_and_missing(tmp_path):
     with pytest.raises(EditError):
         edit_file(src, tmp_path / "x.hwpx",
                   lambda ed: ed.set_text_style(after="없는문구", bold=True))
+
+
+def test_clone_char_pr_bold_italic_order_matches_schema():
+    # 실제 base 템플릿 header.xml의 charPr 0은 offset 다음에 underline이
+    # 바로 오는 실전 구조 — bold/italic을 함께 추가할 때 반복마다 offset을
+    # 다시 찾으면 순서가 italic, bold로 뒤집히는 회귀를 방지한다.
+    xml_bytes = (TEMPLATES_DIR / "base" / "Contents" / "header.xml").read_bytes()
+    he = HeaderEditor(xml_bytes)
+    new_id = he.clone_char_pr("0", bold=True, italic=True)
+    root = ET.fromstring(he.serialize())
+    coll = root.find(f".//{{{NS_HH}}}charProperties")
+    new = next(c for c in coll.findall(f"{{{NS_HH}}}charPr") if c.get("id") == new_id)
+    tags = [child.tag.split("}")[-1] for child in new]
+    assert tags.index("offset") < tags.index("bold") < tags.index("italic") \
+        < tags.index("underline")
+
+
+def test_set_text_style_requires_at_least_one_style_kw(tmp_path):
+    src = build_form_hwpx(tmp_path / "form.hwpx")
+    with pytest.raises(EditError):
+        edit_file(src, tmp_path / "x.hwpx",
+                  lambda ed: ed.set_text_style(after="안녕하세요"))
+
+
+def test_set_para_style_requires_at_least_one_style_kw(tmp_path):
+    src = build_form_hwpx(tmp_path / "form.hwpx")
+    with pytest.raises(EditError):
+        edit_file(src, tmp_path / "x.hwpx",
+                  lambda ed: ed.set_para_style(after="안녕하세요"))

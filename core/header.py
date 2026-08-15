@@ -42,16 +42,24 @@ class HeaderEditor:
         coll, items = self._collection("charProperties", "charPr")
         new = copy.deepcopy(self._find(items, base_id))
         new.set("id", self._next_id(items))
+        # bold/italic 삽입 위치는 offset 다음(없으면 끝)에서 시작해, 하나
+        # 삽입될 때마다 다음 삽입 위치를 한 칸씩 밀어 bold→italic 순서를
+        # 스키마와 일치시킨다(각 반복마다 offset을 다시 찾으면 순서가
+        # 뒤집힌다 — 실제 헤더는 offset, bold, italic, underline 순).
+        anchor = new.find(_h("offset"))
+        insert_idx = list(new).index(anchor) + 1 if anchor is not None else len(new)
         for flag, tag in ((bold, "bold"), (italic, "italic")):
             if flag is None:
                 continue
             existing = new.find(_h(tag))
-            if flag and existing is None:
-                anchor = new.find(_h("offset"))
-                idx = list(new).index(anchor) + 1 if anchor is not None else len(new)
-                new.insert(idx, ET.Element(_h(tag)))
-            elif not flag and existing is not None:
-                new.remove(existing)
+            if existing is not None:
+                if flag:
+                    insert_idx = list(new).index(existing) + 1
+                else:
+                    new.remove(existing)
+            elif flag:
+                new.insert(insert_idx, ET.Element(_h(tag)))
+                insert_idx += 1
         if underline is not None:
             ul = new.find(_h("underline"))
             if ul is None:
