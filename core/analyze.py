@@ -131,6 +131,18 @@ def _norm_label(s):
     return re.sub(r"[\s:：()（）]", "", s)
 
 
+def _scan_checkbox_paren(text, targets):
+    for m in _CHECKBOX_RE.finditer(text):
+        targets.append({"key": _norm_label(m.group(1)),
+                        "kind": "checkbox", "literal": m.group(0)})
+    for m in _PAREN_RE.finditer(text):
+        prefix = text[max(0, m.start() - 10):m.start()]
+        targets.append({"key": _norm_label(prefix),
+                        "kind": "paren", "prefix": prefix,
+                        "blank": m.group(0),
+                        "literal": prefix + m.group(0)})
+
+
 def fill_targets(path):
     pkg = HwpxPackage.open(path)
     targets = []
@@ -160,18 +172,12 @@ def fill_targets(path):
                                 "key": _norm_label(cell_text),
                                 "kind": "label-cell", "label": cell_text,
                                 "table": table_index, "row": r, "col": c + 1})
+                        # 셀 내부 문단도 checkbox/paren 스캔 대상에 포함
+                        _scan_checkbox_paren(cell_text, targets)
                     table_index += 1
                 continue
             text = _para_direct_text(p)
-            for m in _CHECKBOX_RE.finditer(text):
-                targets.append({"key": _norm_label(m.group(1)),
-                                "kind": "checkbox", "literal": m.group(0)})
-            for m in _PAREN_RE.finditer(text):
-                prefix = text[max(0, m.start() - 10):m.start()]
-                targets.append({"key": _norm_label(prefix),
-                                "kind": "paren", "prefix": prefix,
-                                "blank": m.group(0),
-                                "literal": prefix + m.group(0)})
+            _scan_checkbox_paren(text, targets)
     return {"targets": targets}
 
 

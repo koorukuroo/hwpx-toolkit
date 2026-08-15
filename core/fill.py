@@ -10,6 +10,19 @@ def _match(norm_key, target_key):
         or target_key in norm_key
 
 
+def _find_target(nk, targets):
+    # 1단계: 정확히 일치하는 정규화 키 우선 (컨테인먼트로 오탐하는 걸 방지 —
+    # 예: "동의"는 "비동의"의 부분 문자열이라 컨테인먼트만 쓰면 잘못 매칭됨).
+    for t in targets:
+        if nk == t["key"]:
+            return t
+    # 2단계: 정확 일치가 없을 때만 컨테인먼트로 폴백 (합성 paren 키 등 대응).
+    for t in targets:
+        if _match(nk, t["key"]):
+            return t
+    return None
+
+
 def fill_file(src, dst, values=None, cells=None):
     values = values or {}
     cells = cells or []
@@ -19,7 +32,7 @@ def fill_file(src, dst, values=None, cells=None):
     unmatched = []
     for key, val in values.items():
         nk = analyze._norm_label(key)
-        tgt = next((t for t in targets if _match(nk, t["key"])), None)
+        tgt = _find_target(nk, targets)
         if tgt is None:
             unmatched.append(key)
         else:
