@@ -84,7 +84,7 @@ def cmd_build(args):
 
 
 def _finish_edited(dst, report):
-    gate = guards.validate_package(dst)   # Task 6에서 check_package로 교체
+    gate = guards.check_package(dst)
     ok = gate["ok"] and not report.get("not_found")
     payload = {"ok": ok, "output": str(dst), "report": report, "gate": gate}
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -135,11 +135,25 @@ def cmd_fill(args):
     if not values and not cells:
         raise PackageError("--values 또는 --cells 중 하나는 필요합니다")
     report = fill_mod.fill_file(args.src, args.dst, values=values, cells=cells)
-    gate = guards.validate_package(args.dst)   # Task 6에서 check로 교체
+    gate = guards.check_package(args.dst)
     ok = gate["ok"] and not report["unmatched"]
     print(json.dumps({"ok": ok, "output": args.dst, "report": report,
                       "gate": gate}, ensure_ascii=False, indent=2))
     return 0 if ok else 2
+
+
+def cmd_check(args):
+    result = guards.check_package(args.file)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["ok"] else 2
+
+
+def cmd_guard(args):
+    rules = json.loads(_read_text_utf8(args.rules)) if args.rules else None
+    result = guards.guard_against_reference(
+        args.output, args.reference, rules=rules, max_growth=args.max_growth)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["ok"] else 2
 
 
 def build_parser():
@@ -228,6 +242,17 @@ def build_parser():
     f.add_argument("--values", help='{"라벨": "값"} JSON 파일')
     f.add_argument("--cells", help='[{"table","row","col","value"}] JSON 파일')
     f.set_defaults(func=cmd_fill)
+
+    ck = sub.add_parser("check", help="전달 전 필수 게이트 (validate + 사고 패턴)")
+    ck.add_argument("file")
+    ck.set_defaults(func=cmd_check)
+
+    g = sub.add_parser("guard", help="레퍼런스 대비 가드")
+    g.add_argument("output")
+    g.add_argument("--reference", required=True)
+    g.add_argument("--rules", help='{"require":[],"forbid":[],"forbid_regex":[]}')
+    g.add_argument("--max-growth", type=float, default=None)
+    g.set_defaults(func=cmd_guard)
 
     return p
 

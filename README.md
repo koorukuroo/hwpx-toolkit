@@ -16,6 +16,9 @@
     python3 scripts/hwpx.py pack ./out/ 결과.hwpx --source 문서.hwpx
     python3 scripts/hwpx.py new 문서.md -o 문서.hwpx              # 마크다운 → HWPX
     python3 scripts/hwpx.py build --section sec.xml -o 문서.hwpx  # 직접 조립
+    python3 scripts/hwpx.py replace 원본.hwpx 결과.hwpx --map map.json   # 문구 교체
+    python3 scripts/hwpx.py fill 양식.hwpx 결과.hwpx --values values.json # 양식 채우기
+    python3 scripts/hwpx.py check 결과.hwpx                               # 전달 전 게이트
 
 ## 개발
 
