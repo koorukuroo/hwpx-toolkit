@@ -97,6 +97,31 @@ def cmd_replace(args):
     return _finish_edited(args.dst, report)
 
 
+def cmd_set_cell(args):
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.set_cell_text(args.table, args.row,
+                                                   args.col, args.text))
+    return _finish_edited(args.dst,
+                          {"set_cell": [args.table, args.row, args.col]})
+
+
+def cmd_add_row(args):
+    cells = json.loads(_read_text_utf8(args.cells))
+    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.add_row(args.table, cells))
+    return _finish_edited(args.dst, {"added_row": cells})
+
+
+def cmd_del_row(args):
+    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.del_row(args.table, args.row))
+    return _finish_edited(args.dst, {"deleted_row": args.row})
+
+
+def cmd_add_para(args):
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.add_para_after(args.after, args.text))
+    return _finish_edited(args.dst, {"added_after": args.after})
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="hwpx")
     sub = p.add_subparsers(dest="command", required=True)
@@ -145,6 +170,36 @@ def build_parser():
     r.add_argument("dst")
     r.add_argument("--map", required=True, help='{"옛 문구": "새 문구"} JSON 파일')
     r.set_defaults(func=cmd_replace)
+
+    sc = sub.add_parser("set-cell", help="표 셀 텍스트 설정")
+    sc.add_argument("src")
+    sc.add_argument("dst")
+    sc.add_argument("--table", type=int, required=True)
+    sc.add_argument("--row", type=int, required=True)
+    sc.add_argument("--col", type=int, required=True)
+    sc.add_argument("--text", required=True)
+    sc.set_defaults(func=cmd_set_cell)
+
+    ar = sub.add_parser("add-row", help="표 행 추가 (마지막 행 복제)")
+    ar.add_argument("src")
+    ar.add_argument("dst")
+    ar.add_argument("--table", type=int, required=True)
+    ar.add_argument("--cells", required=True, help='["값1","값2"] JSON 파일')
+    ar.set_defaults(func=cmd_add_row)
+
+    dr = sub.add_parser("del-row", help="표 행 삭제")
+    dr.add_argument("src")
+    dr.add_argument("dst")
+    dr.add_argument("--table", type=int, required=True)
+    dr.add_argument("--row", type=int, required=True)
+    dr.set_defaults(func=cmd_del_row)
+
+    ap = sub.add_parser("add-para", help="기준 문구 뒤 문단 추가")
+    ap.add_argument("src")
+    ap.add_argument("dst")
+    ap.add_argument("--after", required=True)
+    ap.add_argument("--text", required=True)
+    ap.set_defaults(func=cmd_add_para)
 
     return p
 

@@ -99,6 +99,152 @@ class SectionEditor:
                 report["not_found"].append(old)
         return report
 
+    # ---- 표 탐색 ----
+    def _tables(self):
+        return list(self.root.iter(_q("tbl")))
+
+    def _get_table(self, table_index):
+        tbls = self._tables()
+        if not 0 <= table_index < len(tbls):
+            raise EditError(f"표 없음: index {table_index} (표 {len(tbls)}개)")
+        return tbls[table_index]
+
+    def _reject_spans(self, tbl):
+        for span in tbl.iter(_q("cellSpan")):
+            if span.get("colSpan") != "1" or span.get("rowSpan") != "1":
+                raise EditError("병합 셀(rowSpan/colSpan)이 있는 표는 구조 편집 불가")
+
+    def _find_cell(self, table_index, row, col):
+        tbl = self._get_table(table_index)
+        for tc in tbl.iter(_q("tc")):
+            addr = tc.find(_q("cellAddr"))
+            if addr is not None and int(addr.get("rowAddr")) == row \
+                    and int(addr.get("colAddr")) == col:
+                return tbl, tc
+        raise EditError(f"셀 없음: 표 {table_index} ({row},{col})")
+
+    def _set_cell_content(self, tc, text):
+        sub = tc.find(_q("subList"))
+        if sub is None:
+            raise EditError("셀에 subList 없음")
+        paras = sub.findall(_q("p"))
+        if not paras:
+            raise EditError("셀에 문단 없음")
+        first = paras[0]
+        run = first.find(_q("run"))
+        if run is None:
+            raise EditError("셀 문단에 run 없음")
+        t = run.find(_q("t"))
+        if t is None:
+            t = ET.SubElement(run, _q("t"))
+        t.text = text
+        for other in self._direct_ts(first):
+            if other is not t:
+                other.text = ""
+        for extra in paras[1:]:
+            for tt in self._direct_ts(extra):
+                tt.text = ""
+            self._mark(extra)
+        self._mark(first)
+
+    # ---- 셀/행 편집 ----
+    def set_cell_text(self, table_index, row, col, text):
+        _, tc = self._find_cell(table_index, row, col)
+        self._set_cell_content(tc, text)
+
+    def add_row(self, table_index, cells):
+        tbl = self._get_table(table_index)
+        self._reject_spans(tbl)
+        trs = tbl.findall(_q("tr"))
+        if not trs:
+            raise EditError("행이 없는 표")
+        last = trs[-1]
+        n_cols = len(last.findall(_q("tc")))
+        if len(cells) != n_cols:
+            raise EditError(f"열 수 불일치: 값 {len(cells)}개, 표 {n_cols}열")
+        new_tr = copy.deepcopy(last)
+        next_id = self._max_id() + 1
+        new_row = len(trs)
+        row_height = 0
+        for tc, value in zip(new_tr.findall(_q("tc")), cells):
+            addr = tc.find(_q("cellAddr"))
+            addr.set("rowAddr", str(new_row))
+            sub = tc.find(_q("subList"))
+            for p in sub.findall(_q("p")):
+                p.set("id", str(next_id))
+                next_id += 1
+                for seg in p.findall(_q("linesegarray")):
+                    p.remove(seg)
+            self._set_cell_content(tc, value)
+            sz = tc.find(_q("cellSz"))
+            if sz is not None:
+                row_height = max(row_height, int(sz.get("height", "0")))
+        tbl.insert(list(tbl).index(last) + 1, new_tr)
+        tbl.set("rowCnt", str(len(trs) + 1))
+        tblsz = tbl.find(_q("sz"))
+        if tblsz is not None and row_height:
+            tblsz.set("height", str(int(tblsz.get("height", "0")) + row_height))
+
+    def del_row(self, table_index, row):
+        tbl = self._get_table(table_index)
+        self._reject_spans(tbl)
+        trs = tbl.findall(_q("tr"))
+        target = None
+        for tr in trs:
+            tc = tr.find(_q("tc"))
+            addr = tc.find(_q("cellAddr")) if tc is not None else None
+            if addr is not None and int(addr.get("rowAddr")) == row:
+                target = tr
+                break
+        if target is None:
+            raise EditError(f"행 없음: {row}")
+        first_tc = target.find(_q("tc"))
+        cellsz = first_tc.find(_q("cellSz")) if first_tc is not None else None
+        removed_h = int(cellsz.get("height", "0")) if cellsz is not None else 0
+        tbl.remove(target)
+        tbl.set("rowCnt", str(len(trs) - 1))
+        for tr in tbl.findall(_q("tr")):
+            for tc in tr.findall(_q("tc")):
+                addr = tc.find(_q("cellAddr"))
+                r = int(addr.get("rowAddr"))
+                if r > row:
+                    addr.set("rowAddr", str(r - 1))
+        tblsz = tbl.find(_q("sz"))
+        if tblsz is not None and removed_h:
+            tblsz.set("height",
+                      str(max(int(tblsz.get("height", "0")) - removed_h, 0)))
+
+    # ---- 문단 추가 ----
+    def add_para_after(self, anchor_text, text):
+        anchor = None
+        for p in self._paras():
+            if anchor_text in self._para_text(p):
+                for run in p.findall(_q("run")):
+                    if (run.find(_q("secPr")) is not None
+                            or run.find(_q("tbl")) is not None
+                            or run.find(_q("pic")) is not None):
+                        raise EditError(
+                            "기준 문단에 secPr/표/그림이 있어 불가 — "
+                            "일반 텍스트 문단을 기준으로 지정")
+                anchor = p
+                break
+        if anchor is None:
+            raise EditError(f"기준 문구 없음: {anchor_text}")
+        parents = {c: par for par in self.root.iter() for c in par}
+        parent = parents.get(anchor)
+        if parent is None:
+            raise EditError("기준 문단의 부모를 찾을 수 없음")
+        new_p = copy.deepcopy(anchor)
+        new_p.set("id", str(self._max_id() + 1))
+        ts = self._direct_ts(new_p)
+        ts[0].text = text
+        for t in ts[1:]:
+            t.text = ""
+        for seg in new_p.findall(_q("linesegarray")):
+            new_p.remove(seg)
+        parent.insert(list(parent).index(anchor) + 1, new_p)
+        self._mark(new_p)
+
     # ---- 직렬화 ----
     def serialize(self):
         for p in self._modified:
