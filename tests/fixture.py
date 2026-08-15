@@ -96,6 +96,17 @@ BODY_PARA = (
     '<hp:run charPrIDRef="0"><hp:t>{text}</hp:t></hp:run></hp:p>'
 )
 
+SPLIT_PARA = (
+    '<hp:p id="{pid}" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+    'columnBreak="0" merged="0">'
+    '<hp:run charPrIDRef="0"><hp:t>{a}</hp:t></hp:run>'
+    '<hp:run charPrIDRef="0"><hp:t>{b}</hp:t></hp:run>'
+    '<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" '
+    'textheight="1000" baseline="850" spacing="600" horzpos="0" '
+    'horzsize="42520" flags="393216"/></hp:linesegarray>'
+    '</hp:p>'
+)
+
 
 def _cell(row, col, text, pid):
     return (
@@ -116,20 +127,25 @@ def _cell(row, col, text, pid):
     )
 
 
-def _table():
-    rows = []
+def _table(rows=None):
+    if rows is None:
+        rows = [["셀00", "셀01"], ["셀10", "셀11"]]
+    tr_parts = []
     pid = 1000000200
-    for r in range(2):
-        cells = "".join(_cell(r, c, f"셀{r}{c}", pid + r * 2 + c) for c in range(2))
-        rows.append(f"<hp:tr>{cells}</hp:tr>")
+    for r, row in enumerate(rows):
+        cells = "".join(_cell(r, c, row[c], pid + r * len(row) + c)
+                        for c in range(len(row)))
+        tr_parts.append(f"<hp:tr>{cells}</hp:tr>")
+    n_rows, n_cols = len(rows), len(rows[0])
     return (
         '<hp:p id="1000000100" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
         'columnBreak="0" merged="0"><hp:run charPrIDRef="0">'
         '<hp:tbl id="1000000101" zOrder="0" numberingType="TABLE" '
         'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
-        'dropcapstyle="None" pageBreak="CELL" repeatHeader="0" rowCnt="2" '
-        'colCnt="2" cellSpacing="0" borderFillIDRef="1" noAdjust="0">'
-        '<hp:sz width="42520" widthRelTo="ABSOLUTE" height="4800" '
+        'dropcapstyle="None" pageBreak="CELL" repeatHeader="0" '
+        f'rowCnt="{n_rows}" colCnt="{n_cols}" cellSpacing="0" '
+        'borderFillIDRef="1" noAdjust="0">'
+        f'<hp:sz width="42520" widthRelTo="ABSOLUTE" height="{2400 * n_rows}" '
         'heightRelTo="ABSOLUTE" protect="0"/>'
         '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" '
         'allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" '
@@ -137,7 +153,7 @@ def _table():
         'vertOffset="0" horzOffset="0"/>'
         '<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
         '<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
-        + "".join(rows) +
+        + "".join(tr_parts) +
         '</hp:tbl></hp:run></hp:p>'
     )
 
@@ -170,4 +186,34 @@ def build_minimal_hwpx(path, *, body_texts=None, with_table=False):
         for name, text in entries:
             ctype = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
             zf.writestr(zipfile.ZipInfo(name), text.encode("utf-8"), compress_type=ctype)
+    return path
+
+
+def build_form_hwpx(path):
+    """편집/채우기 테스트용 양식: 라벨-값 표, 체크박스, 괄호 빈칸, run 분할 문단."""
+    path = Path(path)
+    parts = [SECTION_HEAD]
+    parts.append(_table(rows=[["성명", ""], ["연락처", ""]]))
+    parts.append(BODY_PARA.format(pid=1000000301, text="□동의 □비동의"))
+    parts.append(BODY_PARA.format(pid=1000000302, text="제출 부수: 일반(  )통"))
+    parts.append(SPLIT_PARA.format(pid=1000000303, a="안녕", b="하세요"))
+    parts.append(SPLIT_PARA.format(pid=1000000304, a="감사", b="합니다"))
+    parts.append("</hs:sec>")
+    section0 = "".join(parts)
+
+    entries = [
+        ("mimetype", MIMETYPE),
+        ("version.xml", VERSION_XML),
+        ("settings.xml", SETTINGS_XML),
+        ("META-INF/container.xml", CONTAINER_XML),
+        ("META-INF/manifest.xml", MANIFEST_XML),
+        ("Contents/content.hpf", CONTENT_HPF),
+        ("Contents/header.xml", HEADER_XML),
+        ("Contents/section0.xml", section0),
+    ]
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, text in entries:
+            ctype = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
+            zf.writestr(zipfile.ZipInfo(name), text.encode("utf-8"),
+                        compress_type=ctype)
     return path
