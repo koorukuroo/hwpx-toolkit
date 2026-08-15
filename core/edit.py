@@ -2,6 +2,7 @@
 import copy
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 from core.package import HwpxPackage, PackageError
 
@@ -496,6 +497,154 @@ class SectionEditor:
             new_p.remove(seg)
         parent.insert(list(parent).index(anchor) + 1, new_p)
         self._mark(new_p)
+
+    # ---- 이미지 ----
+    def _pics(self):
+        return list(self.root.iter(_q("pic")))
+
+    def _get_pic(self, index):
+        pics = self._pics()
+        if not 0 <= index < len(pics):
+            raise EditError(f"그림 없음: index {index} (그림 {len(pics)}개)")
+        return pics[index]
+
+    def _fresh_bin_id(self):
+        from core import images
+        bin_id, prefix = images.next_bin_id(self.ctx.pkg)
+        while any(n.startswith(prefix + ".") for n in self.ctx.additions):
+            n = int(bin_id[len("image"):]) + 1
+            bin_id, prefix = f"image{n}", f"BinData/image{n}"
+        return bin_id, prefix
+
+    def _fit(self, px_w, px_h, width_mm, height_mm, keep_w=None, keep_h=None):
+        from core.images import mm_to_hwp, px_to_hwp
+        if width_mm is None and height_mm is None:
+            if keep_w is not None:
+                return keep_w, keep_h
+            return px_to_hwp(px_w), px_to_hwp(px_h)
+        ratio = px_h / px_w if px_w else 1
+        if width_mm is not None and height_mm is not None:
+            return mm_to_hwp(width_mm), mm_to_hwp(height_mm)
+        if width_mm is not None:
+            w = mm_to_hwp(width_mm)
+            return w, int(round(w * ratio))
+        h = mm_to_hwp(height_mm)
+        return int(round(h / ratio)), h
+
+    def insert_image(self, path, *, after=None, index=None, width_mm=None,
+                     height_mm=None):
+        from core import images
+        if self.ctx is None:
+            raise EditError("edit_file 경유 필요")
+        data = Path(path).read_bytes()
+        px_w, px_h, ext = images.image_size(data)
+        bin_id, prefix = self._fresh_bin_id()
+        entry = f"{prefix}.{ext}"
+        self.ctx.stage_addition(entry, data)
+        hpf = self.ctx.replacements.get("Contents/content.hpf")
+        hpf = hpf.decode("utf-8") if hpf else self.ctx.pkg.read_text("Contents/content.hpf")
+        self.ctx.stage_replacement("Contents/content.hpf",
+                                   images.register_in_hpf(hpf, bin_id, entry, ext).encode("utf-8"))
+        w, h = self._fit(px_w, px_h, width_mm, height_mm)
+        anchor = self._target_para(after, index)
+        parents = {c: par for par in self.root.iter() for c in par}
+        parent = parents[anchor]
+        pid = self._max_id() + 1
+        pic_el = ET.fromstring(images.pic_xml(str(pid + 1), bin_id, w, h, px_w, px_h))
+        p = ET.Element(_q("p"), {"id": str(pid), "paraPrIDRef": anchor.get("paraPrIDRef", "0"),
+                                 "styleIDRef": "0", "pageBreak": "0",
+                                 "columnBreak": "0", "merged": "0"})
+        run = ET.SubElement(p, _q("run"), {"charPrIDRef": "0"})
+        run.append(pic_el)
+        parent.insert(list(parent).index(anchor) + 1, p)
+        self._mark(p)
+
+    def list_images(self):
+        from core.images import hwp_to_mm
+        out = []
+        for i, pic in enumerate(self._pics()):
+            img = pic.find(f"{{{NS['hc']}}}img")
+            sz = pic.find(_q("sz"))
+            out.append({"index": i,
+                        "bin_id": img.get("binaryItemIDRef") if img is not None else None,
+                        "width_mm": hwp_to_mm(sz.get("width")) if sz is not None else None,
+                        "height_mm": hwp_to_mm(sz.get("height")) if sz is not None else None})
+        return out
+
+    def _apply_pic_size(self, pic, w, h):
+        for tag in ("curSz", "sz"):
+            el = pic.find(_q(tag))
+            if el is not None:
+                el.set("width", str(w))
+                el.set("height", str(h))
+        rect = pic.find(_q("imgRect"))
+        if rect is not None:
+            pts = {"pt0": (0, 0), "pt1": (w, 0), "pt2": (w, h), "pt3": (0, h)}
+            for name, (x, y) in pts.items():
+                pt = rect.find(f"{{{NS['hc']}}}{name}")
+                if pt is not None:
+                    pt.set("x", str(x))
+                    pt.set("y", str(y))
+
+    def resize_image(self, index, *, width_mm=None, height_mm=None):
+        pic = self._get_pic(index)
+        org = pic.find(_q("orgSz"))
+        sz = pic.find(_q("sz"))
+        px_w, px_h = int(org.get("width")), int(org.get("height"))
+        w, h = self._fit(px_w, px_h, width_mm, height_mm,
+                         keep_w=int(sz.get("width")), keep_h=int(sz.get("height")))
+        self._apply_pic_size(pic, w, h)
+        parents = {c: par for par in self.root.iter() for c in par}
+        self._mark(self._owner_para(pic, parents))
+
+    def _owner_para(self, el, parents):
+        node = el
+        while node is not None and node.tag != _q("p"):
+            node = parents.get(node)
+        if node is None:
+            raise EditError("그림의 소속 문단을 찾을 수 없음")
+        return node
+
+    def replace_image(self, index, path):
+        from core import images
+        pic = self._get_pic(index)
+        data = Path(path).read_bytes()
+        px_w, px_h, ext = images.image_size(data)
+        bin_id, prefix = self._fresh_bin_id()
+        entry = f"{prefix}.{ext}"
+        self.ctx.stage_addition(entry, data)
+        hpf = self.ctx.replacements.get("Contents/content.hpf")
+        hpf = hpf.decode("utf-8") if hpf else self.ctx.pkg.read_text("Contents/content.hpf")
+        self.ctx.stage_replacement("Contents/content.hpf",
+                                   images.register_in_hpf(hpf, bin_id, entry, ext).encode("utf-8"))
+        img = pic.find(f"{{{NS['hc']}}}img")
+        img.set("binaryItemIDRef", bin_id)
+        ow, oh = images.px_to_hwp(px_w), images.px_to_hwp(px_h)
+        for tag, attrs in (("orgSz", ("width", "height")), ("imgDim", ("dimwidth", "dimheight"))):
+            el = pic.find(_q(tag))
+            if el is not None:
+                el.set(attrs[0], str(ow))
+                el.set(attrs[1], str(oh))
+        clip = pic.find(_q("imgClip"))
+        if clip is not None:
+            clip.set("right", str(ow))
+            clip.set("bottom", str(oh))
+        parents = {c: par for par in self.root.iter() for c in par}
+        self._mark(self._owner_para(pic, parents))
+
+    def delete_image(self, index):
+        pic = self._get_pic(index)
+        parents = {c: par for par in self.root.iter() for c in par}
+        run = parents[pic]
+        p = self._owner_para(pic, parents)
+        run.remove(pic)
+        if not list(run):
+            p.remove(run)
+        if not p.findall(_q("run")):
+            gp = parents[p]
+            gp.remove(p)
+        else:
+            self._mark(p)
 
     # ---- 직렬화 ----
     def serialize(self):

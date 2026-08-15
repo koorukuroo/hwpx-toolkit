@@ -123,6 +123,37 @@ def cmd_add_para(args):
     return _finish_edited(args.dst, {"added_after": args.after})
 
 
+def cmd_insert_image(args):
+    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.insert_image(
+        args.image, after=args.after, index=args.para,
+        width_mm=args.width_mm, height_mm=args.height_mm))
+    return _finish_edited(args.dst, {"inserted": args.image})
+
+
+def cmd_list_images(args):
+    pkg = HwpxPackage.open(args.file)
+    ed = edit_mod.SectionEditor.from_package(pkg)
+    print(json.dumps({"images": ed.list_images()}, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_resize_image(args):
+    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.resize_image(
+        args.index, width_mm=args.width_mm, height_mm=args.height_mm))
+    return _finish_edited(args.dst, {"resized": args.index})
+
+
+def cmd_replace_image(args):
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.replace_image(args.index, args.image))
+    return _finish_edited(args.dst, {"replaced": args.index})
+
+
+def cmd_delete_image(args):
+    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.delete_image(args.index))
+    return _finish_edited(args.dst, {"deleted": args.index})
+
+
 def cmd_fill(args):
     if args.analyze:
         result = analyze.fill_targets(args.src)
@@ -334,6 +365,40 @@ def build_parser():
     ps.add_argument("--align", choices=["left", "center", "right", "justify"])
     ps.add_argument("--line-spacing", type=int, help="%%")
     ps.set_defaults(func=cmd_set_para_style)
+
+    ii = sub.add_parser("insert-image", help="이미지 삽입 (PNG/JPEG)")
+    ii.add_argument("src")
+    ii.add_argument("dst")
+    ii.add_argument("--image", required=True)
+    _add_target(ii)
+    ii.add_argument("--width-mm", type=float)
+    ii.add_argument("--height-mm", type=float)
+    ii.set_defaults(func=cmd_insert_image)
+
+    li = sub.add_parser("list-images", help="그림 목록")
+    li.add_argument("file")
+    li.set_defaults(func=cmd_list_images)
+
+    ri = sub.add_parser("resize-image", help="그림 크기 변경")
+    ri.add_argument("src")
+    ri.add_argument("dst")
+    ri.add_argument("--index", type=int, required=True)
+    ri.add_argument("--width-mm", type=float)
+    ri.add_argument("--height-mm", type=float)
+    ri.set_defaults(func=cmd_resize_image)
+
+    rp = sub.add_parser("replace-image", help="그림 교체")
+    rp.add_argument("src")
+    rp.add_argument("dst")
+    rp.add_argument("--index", type=int, required=True)
+    rp.add_argument("--image", required=True)
+    rp.set_defaults(func=cmd_replace_image)
+
+    di = sub.add_parser("delete-image", help="그림 삭제")
+    di.add_argument("src")
+    di.add_argument("dst")
+    di.add_argument("--index", type=int, required=True)
+    di.set_defaults(func=cmd_delete_image)
 
     pg = sub.add_parser("set-page", help="용지/방향/여백")
     pg.add_argument("src")
