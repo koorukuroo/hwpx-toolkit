@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import analyze, guards  # noqa: E402
+from core import edit as edit_mod  # noqa: E402
 from core import markdown as md_mod  # noqa: E402
 from core.package import HwpxPackage, PackageError, pack_dir  # noqa: E402
 from core.template import build_from_template  # noqa: E402
@@ -81,6 +82,21 @@ def cmd_build(args):
     return _finish_generated(args.output)
 
 
+def _finish_edited(dst, report):
+    gate = guards.validate_package(dst)   # Task 6에서 check_package로 교체
+    ok = gate["ok"] and not report.get("not_found")
+    payload = {"ok": ok, "output": str(dst), "report": report, "gate": gate}
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0 if ok else 2
+
+
+def cmd_replace(args):
+    mapping = json.loads(_read_text_utf8(args.map))
+    report = edit_mod.edit_file(args.src, args.dst,
+                                lambda ed: ed.replace_text(mapping))
+    return _finish_edited(args.dst, report)
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="hwpx")
     sub = p.add_subparsers(dest="command", required=True)
@@ -123,6 +139,12 @@ def build_parser():
     b.add_argument("--template", default="base")
     b.add_argument("--title")
     b.set_defaults(func=cmd_build)
+
+    r = sub.add_parser("replace", help="문구 교체 (run 분할 대응)")
+    r.add_argument("src")
+    r.add_argument("dst")
+    r.add_argument("--map", required=True, help='{"옛 문구": "새 문구"} JSON 파일')
+    r.set_defaults(func=cmd_replace)
 
     return p
 
