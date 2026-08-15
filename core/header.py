@@ -12,6 +12,23 @@ def _h(tag):
     return f"{{{NS_HH}}}{tag}"
 
 
+# hh:charPr 스키마 상 offset 다음에 bold, italic이 이 순서로 온다. 삽입 위치는
+# 러닝 인덱스가 아니라 매번 이 순서를 기준으로 "직전에 오는 태그 중 현재
+# new에 실제로 존재하는 마지막 것" 바로 뒤로 계산한다 — 그래야 어떤 플래그가
+# None(미지정)이라 건드리지 않았는지와 무관하게, 이미 있던 형제 요소(base에서
+# 물려받은 bold 등) 뒤에 새 요소가 올바로 붙는다.
+_CHARPR_TAG_ORDER = ("offset", "bold", "italic")
+
+
+def _insert_index(new, tag):
+    idx_in_order = _CHARPR_TAG_ORDER.index(tag)
+    for prev_tag in reversed(_CHARPR_TAG_ORDER[:idx_in_order]):
+        prev = new.find(_h(prev_tag))
+        if prev is not None:
+            return list(new).index(prev) + 1
+    return len(new)
+
+
 class HeaderEditor:
     def __init__(self, xml_bytes):
         self.root = ET.fromstring(xml_bytes)
@@ -42,24 +59,14 @@ class HeaderEditor:
         coll, items = self._collection("charProperties", "charPr")
         new = copy.deepcopy(self._find(items, base_id))
         new.set("id", self._next_id(items))
-        # bold/italic 삽입 위치는 offset 다음(없으면 끝)에서 시작해, 하나
-        # 삽입될 때마다 다음 삽입 위치를 한 칸씩 밀어 bold→italic 순서를
-        # 스키마와 일치시킨다(각 반복마다 offset을 다시 찾으면 순서가
-        # 뒤집힌다 — 실제 헤더는 offset, bold, italic, underline 순).
-        anchor = new.find(_h("offset"))
-        insert_idx = list(new).index(anchor) + 1 if anchor is not None else len(new)
         for flag, tag in ((bold, "bold"), (italic, "italic")):
             if flag is None:
                 continue
             existing = new.find(_h(tag))
-            if existing is not None:
-                if flag:
-                    insert_idx = list(new).index(existing) + 1
-                else:
-                    new.remove(existing)
-            elif flag:
-                new.insert(insert_idx, ET.Element(_h(tag)))
-                insert_idx += 1
+            if flag and existing is None:
+                new.insert(_insert_index(new, tag), ET.Element(_h(tag)))
+            elif not flag and existing is not None:
+                new.remove(existing)
         if underline is not None:
             ul = new.find(_h("underline"))
             if ul is None:
