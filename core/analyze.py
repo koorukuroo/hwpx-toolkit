@@ -88,6 +88,8 @@ def extract_slots(path):
     slots = []
     p_idx = 0
     for name, root in _sections(pkg):
+        sec_no = int(re.fullmatch(r"Contents/section(\d+)\.xml", name).group(1))
+        prefix = "" if sec_no == 0 else f"sec{sec_no}:"
         table_index = 0  # 표 번호는 섹션마다 리셋 (core.edit.SectionEditor와 정렬)
         for p in root.findall(_q("p")):
             tbls = [tbl for run in p.findall(_q("run"))
@@ -109,7 +111,7 @@ def extract_slots(path):
                                 for cp in sublist.findall(_q("p")):
                                     texts.append(_para_direct_text(cp))
                             slots.append({
-                                "key": f"cell:{table_index}:{row}:{col}",
+                                "key": f"{prefix}cell:{table_index}:{row}:{col}",
                                 "type": "cell", "table": table_index,
                                 "row": row, "col": col,
                                 "section": name,
@@ -124,7 +126,7 @@ def extract_slots(path):
     return {"slots": slots}
 
 
-_CHECKBOX_RE = re.compile(r"□\s*(\S{1,10})")
+_CHECKBOX_RE = re.compile(r"[□☐](\S{1,10})")
 _PAREN_RE = re.compile(r"\(\s+\)")
 
 
