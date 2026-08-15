@@ -98,11 +98,15 @@ class HwpxPackage:
     def read_text(self, name):
         return self.read(name).decode("utf-8")
 
-    def write_replaced(self, dst, replacements):
+    def write_replaced(self, dst, replacements, additions=None):
         names = set(self.names())
         for name in replacements:
             if name not in names:
                 raise PackageError(f"원본에 없는 엔트리 교체 불가: {name}")
+        additions = additions or {}
+        for name in additions:
+            if name in names:
+                raise PackageError(f"이미 존재하는 엔트리는 additions 불가: {name}")
         data = self._data
         centrals, eocd = _central_records(data)
         central_by_name = {n: rec for rec, n in centrals}
@@ -132,14 +136,35 @@ class HwpxPackage:
             else:
                 out.write(data[start:end])
 
+        added_centrals = []
+        for name, raw in additions.items():
+            c = zlib.compressobj(9, zlib.DEFLATED, -15)
+            comp = c.compress(raw) + c.flush()
+            crc = zlib.crc32(raw) & 0xFFFFFFFF
+            fname = name.encode("utf-8")
+            offset = out.tell()
+            # 로컬 헤더: sig, ver 20, flags 0x800, method 8, time 0, date 0x21(1980-01-01)
+            out.write(struct.pack("<4sHHHHHIIIHH", b"PK\x03\x04", 20, 0x0800, 8,
+                                  0, 0x21, crc, len(comp), len(raw), len(fname), 0))
+            out.write(fname)
+            out.write(comp)
+            central = struct.pack("<4sHHHHHHIIIHHHHHII", b"PK\x01\x02", 20, 20,
+                                  0x0800, 8, 0, 0x21, crc, len(comp), len(raw),
+                                  len(fname), 0, 0, 0, 0, 0, offset) + fname
+            added_centrals.append(central)
+
         cd_start = out.tell()
         for rec, name in centrals:
             struct.pack_into("<I", rec, 42, new_offsets[name])
             out.write(rec)
+        for rec in added_centrals:
+            out.write(rec)
         cd_size = out.tell() - cd_start
+        total_entries = len(centrals) + len(added_centrals)
         eocd_rec = bytearray(data[eocd:eocd + 22] + data[eocd + 22:eocd + 22 +
                              struct.unpack("<H", data[eocd + 20:eocd + 22])[0]])
-        struct.pack_into("<II", eocd_rec, 12, cd_size, cd_start)
+        struct.pack_into("<HHII", eocd_rec, 8, total_entries, total_entries,
+                         cd_size, cd_start)
         out.write(eocd_rec)
         Path(dst).write_bytes(out.getvalue())
 

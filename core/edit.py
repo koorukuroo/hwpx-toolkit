@@ -25,11 +25,29 @@ class EditError(PackageError):
     pass
 
 
+class EditContext:
+    """섹션/헤더를 넘나드는 편집 세션 상태 — 추가 교체·신규 엔트리를 모은다."""
+
+    def __init__(self, pkg, section_editor):
+        self.pkg = pkg
+        self.section = section_editor
+        self.header = None            # Task 3에서 HeaderEditor
+        self.additions = {}
+        self.replacements = {}
+
+    def stage_replacement(self, name, data):
+        self.replacements[name] = data
+
+    def stage_addition(self, name, data):
+        self.additions[name] = data
+
+
 class SectionEditor:
     def __init__(self, xml_bytes, name="Contents/section0.xml"):
         self.name = name
         self.root = ET.fromstring(xml_bytes)
         self._modified = []          # 수정된 hp:p 요소들 (linesegarray 제거 대상)
+        self.ctx = None              # edit_file이 EditContext를 주입
 
     @classmethod
     def from_package(cls, pkg, name="Contents/section0.xml"):
@@ -277,6 +295,12 @@ class SectionEditor:
 def edit_file(src, dst, fn, section="Contents/section0.xml"):
     pkg = HwpxPackage.open(src)
     editor = SectionEditor.from_package(pkg, section)
+    ctx = EditContext(pkg, editor)
+    editor.ctx = ctx
     result = fn(editor)
-    pkg.write_replaced(dst, {section: editor.serialize()})
+    replacements = {section: editor.serialize()}
+    if ctx.header is not None and ctx.header.dirty:
+        replacements["Contents/header.xml"] = ctx.header.serialize()
+    replacements.update(ctx.replacements)
+    pkg.write_replaced(dst, replacements, additions=ctx.additions)
     return result
