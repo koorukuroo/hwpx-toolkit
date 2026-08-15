@@ -485,7 +485,7 @@ class SectionEditor:
             target_p = hp
         else:
             ctrl = ET.Element(_q("ctrl"))
-            hf = ET.SubElement(ctrl, _q(kind), {"id": "", "applyPageType": "BOTH"})
+            hf = ET.SubElement(ctrl, _q(kind), {"id": "0", "applyPageType": "BOTH"})
             sub = ET.SubElement(hf, _q("subList"), {
                 "id": "", "textDirection": "HORIZONTAL", "lineWrap": "BREAK",
                 "vertAlign": "TOP" if kind == "header" else "BOTTOM",
@@ -504,25 +504,35 @@ class SectionEditor:
                       if c.tag in (_q("secPr"), _q("ctrl"))) + 1
             run.insert(idx, ctrl)
             target_p = hp
+            # run 구조가 바뀐 p0(첫 문단)도 linesegarray가 stale해지므로 유지
+            self._mark(p0)
         if align is not None:
             he = self._require_header()
             target_p.set("paraPrIDRef",
                          he.clone_para_pr(target_p.get("paraPrIDRef", "0"),
                                           align=align))
-        self._mark(p0)
+        self._mark(target_p)
+
+    def _parents_map(self):
+        return {c: par for par in self.root.iter() for c in par}
 
     def remove_header_footer(self, kind):
         if kind not in self._HF_KINDS:
             raise EditError(f"kind는 header|footer: {kind}")
-        p0, run = self._first_run()
+        parents = self._parents_map()
         removed = 0
-        for ctrl in list(run.findall(_q("ctrl"))):
-            if ctrl.find(_q(kind)) is not None:
-                run.remove(ctrl)
-                removed += 1
+        for ctrl in list(self.root.iter(_q("ctrl"))):
+            if ctrl.find(_q(kind)) is None:
+                continue
+            owner_run = parents.get(ctrl)
+            if owner_run is None:
+                continue
+            owner_run.remove(ctrl)
+            removed += 1
+            owner_p = self._owner_para(owner_run, parents)
+            self._mark(owner_p)
         if not removed:
             raise EditError(f"{kind} 없음")
-        self._mark(p0)
 
     def set_page_number(self, *, where="footer", align="center"):
         if where not in self._HF_KINDS:
@@ -534,11 +544,13 @@ class SectionEditor:
         if hp.find(f".//{_q('autoNum')}") is not None:
             return
         r = ET.SubElement(hp, _q("run"), {"charPrIDRef": "0"})
-        auto = ET.SubElement(r, _q("autoNum"), {"num": "1", "numType": "PAGE"})
+        ctrl = ET.SubElement(r, _q("ctrl"))
+        auto = ET.SubElement(ctrl, _q("autoNum"), {"num": "1", "numType": "PAGE"})
         ET.SubElement(auto, _q("autoNumFormat"), {
             "type": "DIGIT", "userChar": "", "prefixChar": "",
             "suffixChar": "", "supscript": "0"})
-        self._mark(self._first_run()[0])
+        ET.SubElement(r, _q("t"))
+        self._mark(hp)
 
     # ---- 문단 추가 ----
     def add_para_after(self, anchor_text, text):
@@ -602,6 +614,19 @@ class SectionEditor:
             bin_id, prefix = f"image{n}", f"BinData/image{n}"
         return bin_id, prefix
 
+    def _stage_new_image(self, data, ext):
+        """새 이미지 바이너리를 addition으로 등록하고 content.hpf manifest에
+        추가한 뒤 새 bin_id를 반환한다. insert_image/replace_image 공용."""
+        from core import images
+        bin_id, prefix = self._fresh_bin_id()
+        entry = f"{prefix}.{ext}"
+        self.ctx.stage_addition(entry, data)
+        hpf = self.ctx.replacements.get("Contents/content.hpf")
+        hpf = hpf.decode("utf-8") if hpf else self.ctx.pkg.read_text("Contents/content.hpf")
+        self.ctx.stage_replacement("Contents/content.hpf",
+                                   images.register_in_hpf(hpf, bin_id, entry, ext).encode("utf-8"))
+        return bin_id
+
     def _fit(self, px_w, px_h, width_mm, height_mm, keep_w=None, keep_h=None):
         from core.images import mm_to_hwp, px_to_hwp
         if width_mm is None and height_mm is None:
@@ -624,13 +649,7 @@ class SectionEditor:
             raise EditError("edit_file 경유 필요")
         data = Path(path).read_bytes()
         px_w, px_h, ext = images.image_size(data)
-        bin_id, prefix = self._fresh_bin_id()
-        entry = f"{prefix}.{ext}"
-        self.ctx.stage_addition(entry, data)
-        hpf = self.ctx.replacements.get("Contents/content.hpf")
-        hpf = hpf.decode("utf-8") if hpf else self.ctx.pkg.read_text("Contents/content.hpf")
-        self.ctx.stage_replacement("Contents/content.hpf",
-                                   images.register_in_hpf(hpf, bin_id, entry, ext).encode("utf-8"))
+        bin_id = self._stage_new_image(data, ext)
         w, h = self._fit(px_w, px_h, width_mm, height_mm)
         anchor = self._target_para(after, index)
         parents = {c: par for par in self.root.iter() for c in par}
@@ -688,21 +707,17 @@ class SectionEditor:
         while node is not None and node.tag != _q("p"):
             node = parents.get(node)
         if node is None:
-            raise EditError("그림의 소속 문단을 찾을 수 없음")
+            raise EditError("요소의 소속 문단을 찾을 수 없음")
         return node
 
     def replace_image(self, index, path):
         from core import images
+        if self.ctx is None:
+            raise EditError("edit_file 경유 필요")
         pic = self._get_pic(index)
         data = Path(path).read_bytes()
         px_w, px_h, ext = images.image_size(data)
-        bin_id, prefix = self._fresh_bin_id()
-        entry = f"{prefix}.{ext}"
-        self.ctx.stage_addition(entry, data)
-        hpf = self.ctx.replacements.get("Contents/content.hpf")
-        hpf = hpf.decode("utf-8") if hpf else self.ctx.pkg.read_text("Contents/content.hpf")
-        self.ctx.stage_replacement("Contents/content.hpf",
-                                   images.register_in_hpf(hpf, bin_id, entry, ext).encode("utf-8"))
+        bin_id = self._stage_new_image(data, ext)
         img = pic.find(f"{{{NS['hc']}}}img")
         img.set("binaryItemIDRef", bin_id)
         ow, oh = images.px_to_hwp(px_w), images.px_to_hwp(px_h)

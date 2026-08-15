@@ -54,7 +54,9 @@
   바이너리는 `BinData/imageN.ext`, content.hpf manifest에 `opf:item id="imageN"
   isEmbeded="1"`로 등록. (2026-08-15 한컴 실물에서 확인)
 - **머리말/꼬리말**: 첫 문단 첫 run, secPr·colPr ctrl 뒤 `hp:ctrl > hp:header|hp:footer
-  @applyPageType > hp:subList > hp:p`. 쪽번호는 그 문단의 run에 `hp:autoNum
-  @numType="PAGE"`. (표준 구조 — 실물 검증 대기)
+  @id="0" @applyPageType > hp:subList > hp:p`. 쪽번호는 그 문단의 run에
+  `hp:run > hp:ctrl > hp:autoNum @numType="PAGE" > hp:autoNumFormat`, ctrl 뒤에
+  빈 `hp:t`가 온다 (autoNum이 ctrl 없이 run 바로 밑에 오면 잘못된 구조).
+  (2026-08-16 한컴 실물(hansol 표본 2건)에서 확인)
 - **스타일 추가**: header.xml의 charPr/paraPr를 복제·변형해 끝에 추가하고 itemCnt 갱신.
   기존 id는 절대 재사용하지 않는다.

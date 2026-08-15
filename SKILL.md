@@ -100,11 +100,13 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
 10. 서식 커맨드(set-text-style/set-para-style)는 대상 문단(--after 문구 | --para N)
     만 바꾼다. header.xml에 새 스타일이 추가되고 다른 문단은 영향 없다.
     스타일을 안 건드린 편집은 header.xml이 바이트 동일하게 유지된다.
-11. 이미지는 PNG/JPEG만. 크기 미지정 시 96dpi 환산, 한쪽만 주면 비율 유지.
-    replace-image는 기존 BinData를 남기고 새 항목을 추가한다.
+11. 이미지는 PNG/JPEG만. insert-image에서 크기 미지정 시 96dpi 환산 (resize-image는
+    한쪽 이상 지정 필요), 한쪽만 주면 비율 유지. replace-image는 기존 BinData를
+    남기고 새 항목을 추가한다.
 12. merge-cells/add-col도 병합 셀이 이미 있는 표에서는 거부된다. 머리말·꼬리말·
-    쪽번호 구조는 한컴 실물 검증이 아직 없으므로(docs/hancom-verification.md)
-    첫 사용 시 결과를 한컴에서 확인하도록 안내한다.
+    쪽번호 구조는 한컴 실물(hansol 표본)로 검증됨(docs/hancom-verification.md,
+    references/owpml-format.md). 모든 편집 커맨드는 section0만 대상으로 한다
+    (다중 섹션 문서의 다른 섹션은 Phase 5).
 
 ## 포맷 상세
 

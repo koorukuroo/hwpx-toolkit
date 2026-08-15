@@ -18,9 +18,12 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
    - [ ] 편집(타이핑) 후 저장이 정상 동작하는가
 4. 편집 후 저장한 파일을 `python3 scripts/hwpx.py validate verify.hwpx`로 재검증한다.
 
-## Phase 4 추가 검증 항목 (구조 미확인 — 우선 확인 필요)
+## Phase 4 추가 검증 항목
 
-머리말·꼬리말·쪽번호는 실물 샘플 없이 표준 구조로 작성했다. 아래를 한 번 확인한다.
+머리말·꼬리말·쪽번호·charPr 순서는 2026-08-16에 한컴이 생성한 실물 hwpx 2건과
+구조 대조 완료(하단 '검증 기록' 참조) — charPr 순서 반전, autoNum의 hp:ctrl
+누락 등을 발견해 수정했다. 아래 항목은 여전히 한컴오피스에서 육안으로
+직접 확인이 필요하다(실물 대조는 XML 구조 비교이지 렌더링 확인이 아님).
 
     python3 scripts/hwpx.py set-header 샘플.hwpx h.hwpx --text "대외비" --align center
     python3 scripts/hwpx.py set-pagenum h.hwpx hp.hwpx --where footer
@@ -57,3 +60,22 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
 - `new`로 마크다운(제목 2단계·불릿·순서목록·3×3 표) → 툴킷생성테스트.hwpx 생성, validate 통과
 - **한컴오피스 열림: 경고 없이 정상, 제목/본문/표 서식 확인** (사용자 확인)
 - 결론: 자체 제작 base 템플릿(OWPML 스펙 기반 클린룸)은 한컴 호환 확인됨. Phase 1~3 전 경로 실물 검증 완료
+
+### 2026-08-16 — Phase 4 구조 실물 대조 (한컴 저작 hwpx 2건, 최종 리뷰)
+
+- 대조 표본: 한컴에서 직접 작성·저장한 hwpx 2건 (~/project/project2026/hansol/*.hwpx, 읽기 전용)
+- 방법: unzip 후 header.xml/section0.xml을 툴킷 산출물과 XML 구조 직접 비교(렌더링 확인 아님)
+- **발견 1**: `hh:charPr` 자식 순서가 실물은 `offset, italic, bold, underline, strikeout,
+  outline, shadow`인데 툴킷은 `offset, bold, italic`로 반전되어 있었음 → `core/header.py`
+  `_CHARPR_TAG_ORDER` 수정
+- **발견 2**: 실물 쪽번호는 `hp:run > hp:ctrl > hp:autoNum > hp:autoNumFormat`이고 ctrl
+  뒤에 빈 `hp:t`가 오는데, 툴킷은 `hp:autoNum`을 `hp:ctrl` 없이 run 바로 밑에 붙이고
+  있었음 → `core/edit.py` `set_page_number` 수정. `hp:header`/`hp:footer`의 `id`도
+  실물은 `"0"`인데 툴킷은 `""`이었음 → 수정
+- **발견 3**: `set_header_footer`/`set_page_number`가 실제로 수정한 헤더/꼬리말 하위
+  문단(hp) 대신 섹션 첫 문단(p0)만 마킹해 stale `hp:linesegarray`가 남는 경로 → 수정
+- **발견 4**: `remove_header_footer`가 p0의 첫 run만 검사해, 다른 문단으로 옮겨진(또는
+  한컴이 그렇게 저장한) header/footer ctrl은 못 찾고 지나쳤음 → 섹션 전체(root.iter)로
+  탐색하도록 수정
+- 결론: Phase 4 머리말·꼬리말·쪽번호·서식 구조는 한컴 실물과 구조적으로 일치 확인.
+  렌더링(육안) 확인은 여전히 미완 — 위 체크리스트 항목 참조

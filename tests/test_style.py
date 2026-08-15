@@ -93,38 +93,39 @@ def _charpr_tags(he, char_id):
     return [child.tag.split("}")[-1] for child in new]
 
 
-def test_clone_char_pr_bold_italic_order_matches_schema():
-    # 실제 base 템플릿 header.xml의 charPr 0은 offset 다음에 underline이
-    # 바로 오는 실전 구조 — bold/italic을 함께 추가할 때 반복마다 offset을
-    # 다시 찾으면 순서가 italic, bold로 뒤집히는 회귀를 방지한다.
+def test_clone_char_pr_italic_bold_order_matches_schema():
+    # 실제 한컴 문서(hansol 실물)의 charPr 순서는 offset, italic, bold,
+    # underline, strikeout, outline, shadow — bold/italic을 함께 추가할 때
+    # 반복마다 offset을 다시 찾으면 순서가 bold, italic으로 뒤집히는 회귀를
+    # 방지한다.
     he = HeaderEditor(_base_template_header_bytes())
     new_id = he.clone_char_pr("0", bold=True, italic=True)
     tags = _charpr_tags(he, new_id)
-    assert tags.index("offset") < tags.index("bold") < tags.index("italic") \
+    assert tags.index("offset") < tags.index("italic") < tags.index("bold") \
         < tags.index("underline")
 
 
-def test_clone_char_pr_italic_only_after_existing_bold():
+def test_clone_char_pr_italic_lands_before_existing_bold():
     # charPr 1은 base에 이미 bold가 있다. italic만 추가로 요청하면(bold는
-    # None이라 건드리지 않음) 새 italic은 기존 bold "뒤"에 와야 한다 —
-    # 러닝 인덱스 방식은 미지정 플래그의 위치 이동을 놓쳐 italic이 bold
-    # "앞"에 삽입되는 회귀가 있었다.
+    # None이라 건드리지 않음) 새 italic은 기존 bold "앞"(offset 바로 뒤)에
+    # 와야 한다 — 러닝 인덱스 방식은 미지정 플래그의 위치 이동을 놓쳐
+    # italic이 bold "뒤"에 삽입되는 회귀가 있었다.
     he = HeaderEditor(_base_template_header_bytes())
     new_id = he.clone_char_pr("1", italic=True)
     tags = _charpr_tags(he, new_id)
-    assert tags.index("offset") < tags.index("bold") < tags.index("italic") \
+    assert tags.index("offset") < tags.index("italic") < tags.index("bold") \
         < tags.index("underline")
 
 
-def test_clone_char_pr_bold_after_existing_italic_from_prior_clone():
-    # 먼저 italic만 추가한 복제본을 만든 뒤, 그 결과를 base로 다시
-    # bold만 추가하면 bold는 새로 생긴 italic "앞"(offset 바로 뒤)에
+def test_clone_char_pr_italic_lands_before_bold_from_prior_clone():
+    # 먼저 bold만 추가한 복제본을 만든 뒤, 그 결과를 base로 다시
+    # italic만 추가하면 italic은 새로 생긴 bold "앞"(offset 바로 뒤)에
     # 와야 한다.
     he = HeaderEditor(_base_template_header_bytes())
-    italic_only_id = he.clone_char_pr("0", italic=True)
-    both_id = he.clone_char_pr(italic_only_id, bold=True)
+    bold_only_id = he.clone_char_pr("0", bold=True)
+    both_id = he.clone_char_pr(bold_only_id, italic=True)
     tags = _charpr_tags(he, both_id)
-    assert tags.index("offset") < tags.index("bold") < tags.index("italic") \
+    assert tags.index("offset") < tags.index("italic") < tags.index("bold") \
         < tags.index("underline")
 
 

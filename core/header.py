@@ -12,12 +12,13 @@ def _h(tag):
     return f"{{{NS_HH}}}{tag}"
 
 
-# hh:charPr 스키마 상 offset 다음에 bold, italic이 이 순서로 온다. 삽입 위치는
-# 러닝 인덱스가 아니라 매번 이 순서를 기준으로 "직전에 오는 태그 중 현재
-# new에 실제로 존재하는 마지막 것" 바로 뒤로 계산한다 — 그래야 어떤 플래그가
-# None(미지정)이라 건드리지 않았는지와 무관하게, 이미 있던 형제 요소(base에서
-# 물려받은 bold 등) 뒤에 새 요소가 올바로 붙는다.
-_CHARPR_TAG_ORDER = ("offset", "bold", "italic")
+# hh:charPr 스키마 상 offset 다음에 italic, bold, underline이 이 순서로 온다
+# (한컴 실물 문서에서 확인: offset, italic, bold, underline, strikeout, outline,
+# shadow). 삽입 위치는 러닝 인덱스가 아니라 매번 이 순서를 기준으로 "직전에
+# 오는 태그 중 현재 new에 실제로 존재하는 마지막 것" 바로 뒤로 계산한다 —
+# 그래야 어떤 플래그가 None(미지정)이라 건드리지 않았는지와 무관하게, 이미
+# 있던 형제 요소(base에서 물려받은 bold 등) 뒤에 새 요소가 올바로 붙는다.
+_CHARPR_TAG_ORDER = ("offset", "italic", "bold", "underline")
 
 
 def _insert_index(new, tag):
@@ -70,8 +71,9 @@ class HeaderEditor:
         if underline is not None:
             ul = new.find(_h("underline"))
             if ul is None:
-                ul = ET.SubElement(new, _h("underline"),
-                                   {"shape": "SOLID", "color": "#000000"})
+                ul = ET.Element(_h("underline"),
+                                {"shape": "SOLID", "color": "#000000"})
+                new.insert(_insert_index(new, "underline"), ul)
             ul.set("type", "BOTTOM" if underline else "NONE")
         if color is not None:
             new.set("textColor", "#" + color.lstrip("#").upper())
