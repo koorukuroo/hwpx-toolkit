@@ -117,6 +117,19 @@ def cmd_del_row(args):
     return _finish_edited(args.dst, {"deleted_row": args.row})
 
 
+def cmd_merge_cells(args):
+    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.merge_cells(
+        args.table, args.row, args.col, args.row2, args.col2))
+    return _finish_edited(args.dst, {"merged": [args.row, args.col, args.row2, args.col2]})
+
+
+def cmd_add_col(args):
+    cells = json.loads(_read_text_utf8(args.cells))
+    edit_mod.edit_file(args.src, args.dst,
+                       lambda ed: ed.add_col(args.table, cells, at=args.at))
+    return _finish_edited(args.dst, {"added_col": cells})
+
+
 def cmd_add_para(args):
     edit_mod.edit_file(args.src, args.dst,
                        lambda ed: ed.add_para_after(args.after, args.text))
@@ -327,6 +340,21 @@ def build_parser():
     dr.add_argument("--table", type=int, required=True)
     dr.add_argument("--row", type=int, required=True)
     dr.set_defaults(func=cmd_del_row)
+
+    mc = sub.add_parser("merge-cells", help="사각 범위 셀 병합")
+    mc.add_argument("src")
+    mc.add_argument("dst")
+    for k in ("table", "row", "col", "row2", "col2"):
+        mc.add_argument(f"--{k}", type=int, required=True)
+    mc.set_defaults(func=cmd_merge_cells)
+
+    ac = sub.add_parser("add-col", help="표 열 추가")
+    ac.add_argument("src")
+    ac.add_argument("dst")
+    ac.add_argument("--table", type=int, required=True)
+    ac.add_argument("--cells", required=True, help='["행0값","행1값",...] JSON 파일')
+    ac.add_argument("--at", type=int)
+    ac.set_defaults(func=cmd_add_col)
 
     ap = sub.add_parser("add-para", help="기준 문구 뒤 문단 추가")
     ap.add_argument("src")

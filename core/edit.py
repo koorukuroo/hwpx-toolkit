@@ -248,6 +248,91 @@ class SectionEditor:
             tblsz.set("height",
                       str(max(int(tblsz.get("height", "0")) - removed_h, 0)))
 
+    def _cell_grid(self, tbl):
+        grid = {}
+        for tr in tbl.findall(_q("tr")):
+            for tc in tr.findall(_q("tc")):
+                addr = tc.find(_q("cellAddr"))
+                grid[(int(addr.get("rowAddr")), int(addr.get("colAddr")))] = (tr, tc)
+        return grid
+
+    def merge_cells(self, table_index, row, col, row2, col2):
+        tbl = self._get_table(table_index)
+        self._reject_spans(tbl)
+        if row2 < row or col2 < col:
+            raise EditError("범위는 (row,col) ≤ (row2,col2)")
+        grid = self._cell_grid(tbl)
+        cells = []
+        for r in range(row, row2 + 1):
+            for c in range(col, col2 + 1):
+                if (r, c) not in grid:
+                    raise EditError(f"셀 없음: ({r},{c})")
+                cells.append(grid[(r, c)])
+        _, anchor = grid[(row, col)]
+        width = sum(int(grid[(row, c)][1].find(_q("cellSz")).get("width"))
+                    for c in range(col, col2 + 1))
+        height = sum(int(grid[(r, col)][1].find(_q("cellSz")).get("height"))
+                     for r in range(row, row2 + 1))
+        extra_text = []
+        for tr, tc in cells:
+            if tc is anchor:
+                continue
+            sub = tc.find(_q("subList"))
+            if sub is not None:
+                for p in sub.findall(_q("p")):
+                    t = self._para_text(p)
+                    if t:
+                        extra_text.append(t)
+            tr.remove(tc)
+        if extra_text:
+            first_p = anchor.find(f"{_q('subList')}/{_q('p')}")
+            base = self._para_text(first_p)
+            self._set_cell_content(anchor, " ".join([base] + extra_text).strip())
+        span = anchor.find(_q("cellSpan"))
+        span.set("colSpan", str(col2 - col + 1))
+        span.set("rowSpan", str(row2 - row + 1))
+        sz = anchor.find(_q("cellSz"))
+        sz.set("width", str(width))
+        sz.set("height", str(height))
+        self._mark(anchor.find(f"{_q('subList')}/{_q('p')}"))
+
+    def add_col(self, table_index, cells, *, at=None):
+        tbl = self._get_table(table_index)
+        self._reject_spans(tbl)
+        trs = tbl.findall(_q("tr"))
+        if len(cells) != len(trs):
+            raise EditError(f"행 수 불일치: 값 {len(cells)}개, 표 {len(trs)}행")
+        n_cols = int(tbl.get("colCnt"))
+        pos = n_cols if at is None else int(at)
+        if not 0 <= pos <= n_cols:
+            raise EditError(f"열 위치 범위 밖: {at}")
+        next_id = self._max_id() + 1
+        added_width = 0
+        for tr, value in zip(trs, cells):
+            tcs = tr.findall(_q("tc"))
+            template = tcs[-1] if pos >= len(tcs) else tcs[pos]
+            new_tc = copy.deepcopy(template)
+            for p in new_tc.find(_q("subList")).findall(_q("p")):
+                p.set("id", str(next_id))
+                next_id += 1
+                for seg in p.findall(_q("linesegarray")):
+                    p.remove(seg)
+            self._set_cell_content(new_tc, value)
+            insert_at = list(tr).index(tcs[pos]) if pos < len(tcs) else list(tr).index(tcs[-1]) + 1
+            tr.insert(insert_at, new_tc)
+            for tc in tr.findall(_q("tc")):
+                addr = tc.find(_q("cellAddr"))
+                c = int(addr.get("colAddr"))
+                if tc is new_tc:
+                    addr.set("colAddr", str(pos))
+                elif c >= pos:
+                    addr.set("colAddr", str(c + 1))
+            added_width = int(new_tc.find(_q("cellSz")).get("width"))
+        tbl.set("colCnt", str(n_cols + 1))
+        tblsz = tbl.find(_q("sz"))
+        if tblsz is not None:
+            tblsz.set("width", str(int(tblsz.get("width", "0")) + added_width))
+
     # ---- 대상 문단 선택 ----
     def _body_paras(self):
         parents = {c: par for par in self.root.iter() for c in par}
