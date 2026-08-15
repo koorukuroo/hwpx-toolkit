@@ -95,3 +95,13 @@ def test_add_para_anchor_missing_or_container(tmp_path):
     with pytest.raises(EditError):
         edit_file(src, tmp_path / "x.hwpx",
                   lambda ed: ed.add_para_after("존재하지 않는 문구", "x"))
+
+
+def test_add_para_after_ignores_cell_only_match(tmp_path):
+    # "성명"은 표 셀 안에만 존재 — 본문 문단에는 없으므로 EditError.
+    # 셀 subList 안에 조용히 삽입되는 회귀를 막는다.
+    src = build_form_hwpx(tmp_path / "form.hwpx")
+    dst = tmp_path / "x.hwpx"
+    with pytest.raises(EditError):
+        edit_file(src, dst, lambda ed: ed.add_para_after("성명", "새 문단"))
+    assert not dst.exists()

@@ -216,8 +216,22 @@ class SectionEditor:
 
     # ---- 문단 추가 ----
     def add_para_after(self, anchor_text, text):
+        parents = {c: par for par in self.root.iter() for c in par}
+
+        def _in_table_cell(p):
+            node = p
+            while True:
+                par = parents.get(node)
+                if par is None:
+                    return False
+                if par.tag == _q("subList"):
+                    return True
+                node = par
+
         anchor = None
         for p in self._paras():
+            if _in_table_cell(p):
+                continue  # 표 셀 내부 문단은 기준으로 사용하지 않음 (본문만)
             if anchor_text in self._para_text(p):
                 for run in p.findall(_q("run")):
                     if (run.find(_q("secPr")) is not None
@@ -229,8 +243,7 @@ class SectionEditor:
                 anchor = p
                 break
         if anchor is None:
-            raise EditError(f"기준 문구 없음: {anchor_text}")
-        parents = {c: par for par in self.root.iter() for c in par}
+            raise EditError(f"본문에서 기준 문구를 찾지 못함: {anchor_text}")
         parent = parents.get(anchor)
         if parent is None:
             raise EditError("기준 문단의 부모를 찾을 수 없음")
