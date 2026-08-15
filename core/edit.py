@@ -285,8 +285,9 @@ class SectionEditor:
                         extra_text.append(t)
             tr.remove(tc)
         if extra_text:
-            first_p = anchor.find(f"{_q('subList')}/{_q('p')}")
-            base = self._para_text(first_p)
+            anchor_sub = anchor.find(_q("subList"))
+            anchor_texts = [self._para_text(p) for p in anchor_sub.findall(_q("p"))]
+            base = " ".join(t for t in anchor_texts if t)
             self._set_cell_content(anchor, " ".join([base] + extra_text).strip())
         span = anchor.find(_q("cellSpan"))
         span.set("colSpan", str(col2 - col + 1))

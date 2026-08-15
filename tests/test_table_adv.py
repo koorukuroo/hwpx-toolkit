@@ -1,3 +1,4 @@
+import copy
 import xml.etree.ElementTree as ET
 import pytest
 from core.package import HwpxPackage
@@ -25,6 +26,34 @@ def test_merge_cells_row(tmp_path):
     assert anchor.find(f"{{{NS_HP}}}cellSpan").get("colSpan") == "2"
     assert anchor.find(f"{{{NS_HP}}}cellSz").get("width") == "42520"
     assert tbl.get("rowCnt") == "2" and tbl.get("colCnt") == "2"
+    assert check_package(dst)["ok"]
+
+
+def test_merge_cells_preserves_all_anchor_paragraphs(tmp_path):
+    # 앵커 셀에 문단이 2개 있는 상태에서 병합하면, 두 문단 모두와
+    # 제거되는 셀의 텍스트가 손실 없이 합쳐져야 한다.
+    src = build_form_hwpx(tmp_path / "f.hwpx")
+    dst = tmp_path / "merged_multi.hwpx"
+
+    def _mutate(ed):
+        _, tc = ed._find_cell(0, 0, 0)
+        sub = tc.find(f"{{{NS_HP}}}subList")
+        first_p = sub.find(f"{{{NS_HP}}}p")
+        new_p = copy.deepcopy(first_p)
+        new_p.set("id", str(ed._max_id() + 1))
+        t = new_p.find(f"{{{NS_HP}}}run").find(f"{{{NS_HP}}}t")
+        t.text = "둘째줄"
+        sub.append(new_p)
+        ed.set_cell_text(0, 0, 1, "비고")
+        ed.merge_cells(0, 0, 0, 0, 1)
+
+    edit_file(src, dst, _mutate)
+    tbl = _tbl(dst)
+    anchor = list(tbl.iter(f"{{{NS_HP}}}tc"))[0]
+    text = "".join(t.text or "" for t in anchor.iter(f"{{{NS_HP}}}t"))
+    assert "성명" in text
+    assert "둘째줄" in text
+    assert "비고" in text
     assert check_package(dst)["ok"]
 
 
