@@ -47,6 +47,12 @@
 7. `hp:linesegarray`는 한컴의 줄 배치 캐시 — 텍스트 수정 시 해당 문단 것을 제거해야
    손상 경고를 피한다 (Phase 3 edit에서 구현).
 
+## 템플릿 스타일 맵 (styles.json)
+
+`new` 커맨드가 마크다운을 HWPX로 생성할 때 `styles.json`에서 charPr/paraPr/borderFill ID를 조회한다.
+base 템플릿과 report 템플릿은 서로 다른 스타일 맵을 가지며,
+`templates/<template-name>/styles.json`에 정의된다. 자세한 ID 맵은 references/base-template-styles.md 참조.
+
 ## 개체 구조 노트 (Phase 4)
 
 - **그림**: `hp:p > hp:run > hp:pic` (offset/orgSz/curSz/flip/rotationInfo/renderingInfo/

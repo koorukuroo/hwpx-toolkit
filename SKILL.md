@@ -1,8 +1,6 @@
 ---
 name: hwpx-toolkit
-description: "한글(HWPX) 문서 읽기·분석·검증 스킬 (Phase 1). .hwpx 파일, 한글 문서,
-  Hancom, OWPML 관련 요청 시 사용. 생성·편집 기능은 이후 Phase에서 추가된다.
-  .hwp 바이너리는 지원하지 않는다."
+description: "한글(HWPX) 문서 읽기·분석·생성·편집·서식·이미지·검증·HWP→HWPX 변환(명시 요청 시)·공문서 검수 스킬."
 allowed-tools: Bash(python3 *), Read, Write, Glob, Grep
 ---
 
@@ -28,7 +26,10 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
      ├─ "문단 추가" → add-para
      ├─ "파일 정상 확인" → check (편집 후엔 guard --reference 원본 병행)
      ├─ "XML 직접 수정" → unpack → 편집 → pack --source
-     └─ .hwp 파일 → 미지원 안내
+     ├─ .hwp 파일 + "HWPX로 변환해줘"(명시) → from-hwp → check 통과 후 전달
+     ├─ .hwp 파일 + 그 외 요청 → 변환 여부 먼저 확인 (자동 변환 금지)
+     ├─ "공문서 작성법 검수/맞춤법 표기 확인" → lint
+     └─ "보고서 양식으로 만들어줘" → new --template report
 
 ## 커맨드
 
@@ -69,6 +70,12 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
     # 게이트
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" check 결과.hwpx
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" guard 결과.hwpx --reference 원본.hwpx --rules rules.json
+    # 변환
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" from-hwp 원본.hwp -o 변환.hwpx      # Node.js 18+ 필요
+    # 검수
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" lint 문서.hwpx                       # 공문서 표기 검수 (JSON)
+    # 템플릿
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx --template report
 
 ## 필수 규칙
 
@@ -78,7 +85,8 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
    사용자에게 완료를 보고하지 않는다.
 3. XML 편집 시 네임스페이스 접두사(hp:, hs:, hh:, hc:)를 유지하고,
    `<hp:t>` 내부 자식 태그(hp:fwSpace 등)를 삭제하지 않는다.
-4. .hwp(구형 바이너리)는 읽기·편집·변환 모두 미지원. 한글에서
+4. .hwp(구형 바이너리)는 읽기·편집 미지원, 변환은 명시 요청 시 from-hwp 사용
+   (rule 13 참조). 사용자가 변환을 원하지 않으면 한글에서
    "다른 이름으로 저장 → HWPX"를 안내한다.
 5. new/build는 validate를 자동 실행한다. 출력 JSON의 ok가 false면 산출물을
    사용자에게 전달하지 않는다.
@@ -107,6 +115,11 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
     쪽번호 구조는 한컴 실물(hansol 표본)로 검증됨(docs/hancom-verification.md,
     references/owpml-format.md). 모든 편집 커맨드는 section0만 대상으로 한다
     (다중 섹션 문서의 다른 섹션은 Phase 5).
+13. .hwp는 사용자가 HWPX 변환을 명시적으로 요청한 경우에만 from-hwp로 변환한다.
+    변환본은 별도 파일이며 원본 .hwp는 건드리지 않는다. Node.js가 없으면 설치를
+    안내하고, 다른 커맨드는 그대로 쓸 수 있다.
+14. lint는 게이트가 아니다. findings를 요약해 사용자에게 보여주고 수정 여부는
+    사용자가 정한다(공문 표기 규칙은 references/gonmun-rules.md).
 
 ## 포맷 상세
 

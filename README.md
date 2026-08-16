@@ -22,6 +22,9 @@
     python3 scripts/hwpx.py insert-image 원본.hwpx 결과.hwpx --image 그림.png --after "그림 위치" --width-mm 80
     python3 scripts/hwpx.py set-header 원본.hwpx 결과.hwpx --text "대외비" --align center
     python3 scripts/hwpx.py check 결과.hwpx                               # 전달 전 게이트
+    python3 scripts/hwpx.py from-hwp 원본.hwp -o 변환.hwpx                # HWP→HWPX 변환 (Node.js 18+)
+    python3 scripts/hwpx.py lint 문서.hwpx                                # 공문서 표기 검수
+    python3 scripts/hwpx.py new 입력.md -o 결과.hwpx --template report    # 보고서 템플릿
 
 ## 개발
 
@@ -29,4 +32,4 @@
 
 ## 라이선스
 
-MIT — [LICENSE](LICENSE) 참조. 설계 배경은 docs/superpowers/specs/ 참조.
+MIT — [LICENSE](LICENSE) 참조. 외부 컴포넌트는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 참조 (rhwp MIT 동봉). 설계 배경은 docs/superpowers/specs/ 참조.

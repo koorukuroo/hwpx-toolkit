@@ -13,12 +13,16 @@
 | charPr | 2 | 14pt(1400) 돋움 볼드 — H2 |
 | charPr | 3 | 12pt(1200) 돋움 볼드 — H3 이하 |
 | charPr | 4 | 10pt(1000) 돋움 볼드 — 표 헤더 |
+| charPr | 5 | 16pt(1600) 돋움 볼드 — report 템플릿 H1 제목 |
+| charPr | 6 | 10pt(1000) 돋움 볼드 흰색 — report 템플릿 section-bar 텍스트 |
 | paraPr | 0 | JUSTIFY 160% 본문 |
 | paraPr | 1 | CENTER 160%, prev/next 800 — 제목(H1) |
 | paraPr | 2 | LEFT 160%, prev 600 next 200 — H2 |
 | paraPr | 3 | LEFT 160%, prev 400 next 100 — H3 이하 |
 | paraPr | 4 | JUSTIFY 160%, left 600 — 목록 |
 | paraPr | 5 | CENTER 130% — 표 셀 |
+| paraPr | 6 | CENTER 130% — report 템플릿 section-bar |
+| borderFill | 5 | SOLID 0.12mm #1F3864 — report 템플릿 section-bar 배경 |
 | style | 0 | PARA "바탕글" (paraPr 0 + charPr 0) |
 
 - 템플릿 수정은 `scripts/dev/gen_templates.py`를 고쳐 재실행한다.
