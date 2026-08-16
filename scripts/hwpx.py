@@ -12,6 +12,7 @@ from core import analyze, guards  # noqa: E402
 from core import convert as convert_mod  # noqa: E402
 from core import edit as edit_mod  # noqa: E402
 from core import fill as fill_mod  # noqa: E402
+from core import lint as lint_mod  # noqa: E402
 from core import markdown as md_mod  # noqa: E402
 from core.package import HwpxPackage, PackageError, pack_dir  # noqa: E402
 from core.template import build_from_template  # noqa: E402
@@ -268,6 +269,12 @@ def cmd_from_hwp(args):
     return 0 if result["ok"] else 2
 
 
+def cmd_lint(args):
+    result = lint_mod.lint_file(args.file)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_guard(args):
     rules = json.loads(_read_text_utf8(args.rules)) if args.rules else None
     result = guards.guard_against_reference(
@@ -484,6 +491,10 @@ def build_parser():
     fh.add_argument("input")
     fh.add_argument("-o", "--output", required=True)
     fh.set_defaults(func=cmd_from_hwp)
+
+    ln = sub.add_parser("lint", help="공문서 작성법 검수 (hwpx 또는 텍스트)")
+    ln.add_argument("file")
+    ln.set_defaults(func=cmd_lint)
 
     g = sub.add_parser("guard", help="레퍼런스 대비 가드")
     g.add_argument("output")
