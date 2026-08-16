@@ -56,7 +56,7 @@ ln -s "$(pwd)" ~/.claude/skills/hwpx-toolkit
 | `analyze <file> [--slots]` | 페이지 설정·스타일 수·표 구조 리포트. `--slots`는 편집 가능한 문단/셀 목록 |
 | `validate <file>` | ZIP·XML 구조와 ID 참조 정합성 검증 |
 | `check <file>` | **전달 전 필수 게이트** — validate + 한컴 사고 패턴(글자 테두리 버그, 세로쓰기 오변환, 깨진 이미지 참조) 검출 |
-| `guard <out> --reference <원본> [--rules r.json] [--max-growth 1.1]` | 원본 대비 검사 — 비변경 엔트리 바이트 동일, 필수/금지 키워드, 글자 수 증가(쪽수 드리프트) |
+| `guard <out> --reference <원본> [--rules r.json] [--max-growth 1.1] [--max-unchanged-ratio 0.35] [--no-default-placeholders]` | 원본 대비 검사 — 비변경 엔트리 바이트 동일, 필수/금지 키워드, 미완성 표시(`○○`·`{{}}`·`<<>>`·TODO·TBD), 글자 수 증가, 원문 잔존 비율 |
 | `unpack <file> <dir>` / `pack <dir> <out> [--source 원본]` | ZIP 해체·재조립 (XML 직접 수정용, `--source`로 바이트 보존) |
 
 ### 생성
@@ -103,6 +103,7 @@ ln -s "$(pwd)" ~/.claude/skills/hwpx-toolkit
 
 | 커맨드 | 설명 |
 |--------|------|
+| `fix-borders <src> <dst>` | `check`가 검출한 글자 테두리 버그 수리 (header.xml만 변경) |
 | `lint <file>` | 공문서 표기 검수 — 날짜·시간·금액 표기, 붙임·`끝.`, 항목 기호 체계, 쌍점 띄어쓰기. **안내용이며 종료 코드를 바꾸지 않습니다**(파일 오류만 exit 2) |
 
 ---
@@ -178,6 +179,7 @@ python3 scripts/hwpx.py lint 공고문.hwpx                     # 표기 검수
 - 이미지는 PNG와 JPEG만 지원합니다.
 - 각주·미주·하이퍼링크·책갈피·도형·차트는 아직 지원하지 않습니다.
 - `lint`는 안내 도구입니다. 규칙은 행정업무운영 편람의 표기 원칙을 정리한 것이며(`references/gonmun-rules.md`), 판단은 사용자가 합니다.
+- 셀 넘침(`cell-overflow-risk`)은 글자 크기·셀 크기 기반 **추정**이라 실제 렌더링과 다를 수 있습니다. 경고일 뿐 차단하지 않습니다.
 
 ---
 

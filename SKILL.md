@@ -25,6 +25,7 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
      ├─ "이미지 넣어줘/바꿔줘" → insert-image / list-images / resize-image / replace-image / delete-image
      ├─ "문단 추가" → add-para
      ├─ "파일 정상 확인" → check (편집 후엔 guard --reference 원본 병행)
+     │   ├─ check가 char_border_bug 보고 → fix-borders 실행 후 재check
      ├─ "XML 직접 수정" → unpack → 편집 → pack --source
      ├─ .hwp 파일 + "HWPX로 변환해줘"(명시) → from-hwp(자동 check) → 통과 시 전달
      ├─ .hwp 파일 + 그 외 요청 → 변환 여부 먼저 확인 (자동 변환 금지)
@@ -69,7 +70,8 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" add-para 원본.hwpx 결과.hwpx --after "기준 문구" --text "새 문단"
     # 게이트
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" check 결과.hwpx
-    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" guard 결과.hwpx --reference 원본.hwpx --rules rules.json
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" fix-borders 원본.hwpx 결과.hwpx   # 글자 테두리 버그 수리
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" guard 결과.hwpx --reference 원본.hwpx --max-unchanged-ratio 0.35
     # 변환
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" from-hwp 원본.hwp -o 변환.hwpx      # Node.js 18+ 필요
     # 검수
@@ -122,6 +124,18 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
     안내하고, 다른 커맨드는 그대로 쓸 수 있다.
 14. lint는 게이트가 아니다. findings를 요약해 사용자에게 보여주고 수정 여부는
     사용자가 정한다(공문 표기 규칙은 references/gonmun-rules.md).
+15. check가 `char-border-bug`를 보고하면 `fix-borders`로 수리한 뒤 다시 check한다.
+    수리는 header.xml만 바꾸므로 본문은 그대로다.
+16. check의 `cell-overflow-risk` 경고는 추정이라 ok를 막지 않는다. 양식을 채울 때는
+    `fill --analyze`가 알려주는 각 타겟의 `capacity`(추정 수용 글자 수, **em 단위**:
+    ASCII 0.5em, 한글 1em)를 보고 값 길이를 맞추거나, 넘칠 수밖에 없으면 사용자에게 알린다.
+    경고는 동시에 일반 문자 수도 표시한다.
+17. 문서 전체를 새 관점으로 재작성하는 작업(기관 교체 등)은 guard에
+    `--max-unchanged-ratio 0.35`를 붙여 원문이 그대로 남지 않았는지 확인한다.
+    guard는 `○○`, `{{...}}`, `<<>>`, `TODO`, `TBD`, `. . .` 같은 미완성 표시도
+    기본 검사한다. 주의: 기본 placeholder 패턴의 `○○`는 한국 공문에서 흔한 익명화
+    표기(`홍○○`, `○○부`)에도 걸리므로, 익명화가 포함된 문서를 검사할 때는
+    `--no-default-placeholders`를 쓰거나 findings를 사람이 판단한다.
 
 ## 포맷 상세
 
