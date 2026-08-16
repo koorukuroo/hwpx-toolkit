@@ -270,6 +270,9 @@ def cmd_from_hwp(args):
 
 
 def cmd_lint(args):
+    # findings는 게이트가 아니므로 findings 유무는 exit code에 영향을 주지 않는다(항상 0).
+    # 파일을 못 찾거나 hwpx가 손상된 경우 등은 예외로 올라가 main()의 표준
+    # JSON+exit 2 오류 계약을 그대로 따른다 (다른 명령과 동일).
     result = lint_mod.lint_file(args.file)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
@@ -492,7 +495,9 @@ def build_parser():
     fh.add_argument("-o", "--output", required=True)
     fh.set_defaults(func=cmd_from_hwp)
 
-    ln = sub.add_parser("lint", help="공문서 작성법 검수 (hwpx 또는 텍스트)")
+    ln = sub.add_parser(
+        "lint", help="공문서 작성법 검수 (hwpx 또는 텍스트; findings는 게이트 아님, "
+                     "파일 오류만 exit 2)")
     ln.add_argument("file")
     ln.set_defaults(func=cmd_lint)
 

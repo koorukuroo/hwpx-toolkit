@@ -21,4 +21,7 @@ python3 scripts/hwpx.py lint document.txt
 ```
 
 JSON 결과: `{"findings": [{"rule", "line", "text", "message", "suggest"}], "count": N}`.
-검수는 항상 exit 0으로 끝난다 — findings 유무는 `count`로 판단한다.
+findings는 게이트가 아니므로 결과에 findings가 있어도(=`count > 0`이어도) exit code는 항상 0이다 —
+findings 유무는 결과 JSON의 `count`로 판단한다.
+단, 파일을 찾을 수 없거나 hwpx 패키지가 손상된 경우 등 파일 자체의 오류는 이 규칙과 별개로
+툴킷의 표준 오류 계약(JSON + exit 2)을 그대로 따른다(다른 명령들과 동일).

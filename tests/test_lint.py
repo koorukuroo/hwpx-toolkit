@@ -47,3 +47,24 @@ def test_lint_file_hwpx(tmp_path):
     p = build_minimal_hwpx(tmp_path / "a.hwpx", body_texts=["회의 2026.8.16 개최"])
     r = lint_file(p)
     assert r["count"] >= 1 and r["findings"][0]["rule"] == "date-format"
+
+
+def test_colon_spacing_ignores_urls():
+    assert "colon-spacing" not in _rules("http://gov.kr")
+    assert "colon-spacing" not in _rules("https://www.example.go.kr 참고")
+
+
+def test_item_hierarchy_ignores_proviso_lines():
+    assert "item-hierarchy" not in _rules("단. 부득이한 사유가 있는 경우")
+    assert "item-hierarchy" not in _rules("주. 상기 내용은 예시임.")
+    assert "item-hierarchy" not in _rules("1. 개요\n가. 세부")
+
+
+def test_date_format_ignores_document_numbers_and_filenames():
+    assert "date-format" not in _rules("관리번호: 2023-05-12-001")
+    assert "date-format" not in _rules("파일명 2026-08-16-report.hwpx")
+    assert "date-format" in _rules("2026-08-16 제출")
+
+
+def test_time_format_ignores_clock_direction():
+    assert "time-format" not in _rules("3시 방향")
