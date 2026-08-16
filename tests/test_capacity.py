@@ -1,8 +1,9 @@
-from core.capacity import estimate_chars, cell_report, for_cell, OVER_MARGIN
+from core.capacity import estimate_chars, cell_report, for_cell, OVER_MARGIN, text_width_em
 from core.analyze import fill_targets
 from core.guards import check_package
 from core.edit import edit_file
-from tests.fixture import build_form_hwpx, build_minimal_hwpx
+from tests.fixture import build_form_hwpx, build_minimal_hwpx, SECTION_HEAD, _table
+from tests.test_fill import _NESTED_OUTER_TABLE, _pack_section0
 
 M141 = {"left": 141, "right": 141, "top": 141, "bottom": 141}
 
@@ -28,7 +29,8 @@ def test_cell_report_on_form_fixture(tmp_path):
     assert len(cells) == 4                       # 2×2 표
     first = next(c for c in cells if (c["row"], c["col"]) == (0, 0))
     assert first["capacity"] == 20
-    assert first["used"] == 2                    # "성명"
+    assert first["used"] == 2.0                  # "성명" — 한글 2자 = 2.0em
+    assert first["used_chars"] == 2
     assert first["over"] is False
     assert first["table"] == 0
 
@@ -53,7 +55,8 @@ def test_overflow_detected_and_reported_as_warning(tmp_path):
 
     cells = cell_report(dst)["cells"]
     target = next(c for c in cells if (c["row"], c["col"]) == (0, 1))
-    assert target["used"] == 60 and target["over"] is True
+    assert target["used"] == 60.0 and target["over"] is True  # 한글 60자 = 60.0em
+    assert target["used_chars"] == 60
 
     r = check_package(dst)
     assert r["ok"] is True                       # 경고이지 오류가 아님
@@ -69,3 +72,66 @@ def test_no_false_overflow_on_clean_fixtures(tmp_path):
 
 def test_margin_constant_is_lenient():
     assert OVER_MARGIN >= 1.1
+
+
+def test_cell_report_ignores_nested_table_cells(tmp_path):
+    """중첩 표의 셀은 최상위 표의 셀로 잘못 집계되면 안 된다 (analyze._table_rows,
+    edit._tables와 동일하게 최상위 표만 v1 지원 대상). _NESTED_OUTER_TABLE은
+    표0의 유일한 셀 안에 다시 1x1 표를 품는다."""
+    second_table = _table(rows=[["둘째표", ""]])
+    section0 = SECTION_HEAD + _NESTED_OUTER_TABLE + second_table + "</hs:sec>"
+    path = _pack_section0(tmp_path / "nested.hwpx", section0)
+
+    cells = cell_report(path)["cells"]
+    keys = [(c["section"], c["table"], c["row"], c["col"]) for c in cells]
+    assert len(keys) == len(set(keys))            # 중복 키 없음
+
+    # 표0은 셀이 1개(중첩 표를 품은 그 셀)뿐이어야 하고, 그 텍스트는 outer
+    # 셀 자체의 직접 텍스트(빈 문자열)여야 한다 — 중첩 표의 "중첩" 텍스트가
+    # 표0/(0,0)으로 새어 들어가면 안 된다.
+    table0 = [c for c in cells if c["table"] == 0]
+    assert len(table0) == 1
+    assert table0[0]["used_chars"] == 0
+
+    # 표1(둘째표)은 정상적으로 2셀 집계된다.
+    table1 = [c for c in cells if c["table"] == 1]
+    assert len(table1) == 2
+
+
+def test_ascii_digits_are_half_width_not_over_but_hangul_is(tmp_path):
+    """실물 문서에서 "125,000" 같은 반각 숫자/콤마 셀이 글자 수 기준으로는
+    넘침처럼 보여도 실제로는 em 폭 기준이라 넘치지 않아야 한다."""
+    assert text_width_em("125,000") == 3.5
+    assert text_width_em("가나다") == 3.0
+    assert text_width_em("1 2") == 1.0            # 공백 제외
+
+    # capacity 20(em)인 폼 기준 셀 — 임계는 20*1.15=23em.
+    src = build_form_hwpx(tmp_path / "form.hwpx")
+
+    dst_ascii = tmp_path / "ascii.hwpx"
+    edit_file(src, dst_ascii, lambda ed: ed.set_cell_text(0, 0, 1, "1" * 25))
+    cells = cell_report(dst_ascii)["cells"]
+    target = next(c for c in cells if (c["row"], c["col"]) == (0, 1))
+    assert target["used_chars"] == 25              # 옛 로직이면 25 > 23 → 오탐
+    assert target["used"] == 12.5                  # 반각 25자 = 12.5em
+    assert target["over"] is False                 # em 기준으로는 넘치지 않음
+
+    dst_hangul = tmp_path / "hangul.hwpx"
+    edit_file(src, dst_hangul, lambda ed: ed.set_cell_text(0, 0, 1, "가" * 25))
+    cells2 = cell_report(dst_hangul)["cells"]
+    target2 = next(c for c in cells2 if (c["row"], c["col"]) == (0, 1))
+    assert target2["used"] == 25.0
+    assert target2["over"] is True                 # 한글 25자는 실제로 넘침
+
+
+def test_numeric_cell_not_over_capacity_seven():
+    """브리프 재현 예시: 추정 수용 7em 셀에 "125,000"(7자, 3.5em)은 넘치지
+    않지만, 같은 셀에 한글 20자(20em)가 들어가면 넘친다."""
+    capacity = 7
+    used_numeric = round(text_width_em("125,000"), 1)
+    assert used_numeric == 3.5
+    assert not (capacity and used_numeric > capacity * OVER_MARGIN)
+
+    used_hangul = round(text_width_em("가" * 20), 1)
+    assert used_hangul == 20.0
+    assert capacity and used_hangul > capacity * OVER_MARGIN

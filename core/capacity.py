@@ -53,6 +53,24 @@ def _int_attr(el, name, default=0):
     return int(v) if v and v.lstrip("-").isdigit() else default
 
 
+def text_width_em(text):
+    """공백 제외, ASCII는 0.5em(반각), 그 외(한글 등)는 1.0em(전각)으로 폭 합산."""
+    total = 0.0
+    for ch in text:
+        if ch.isspace():
+            continue
+        total += 0.5 if ord(ch) < 128 else 1.0
+    return total
+
+
+def _direct_cells(tbl):
+    """표의 직접 자식 셀만 순회 (중첩 표는 제외 — analyze._table_rows,
+    edit._tables와 동일하게 최상위 표만 v1 지원 대상으로 본다)."""
+    for tr in tbl.findall(_q("tr")):
+        for tc in tr.findall(_q("tc")):
+            yield tc
+
+
 def cell_report(path):
     pkg = HwpxPackage.open(path)
     chars, paras = _style_maps(pkg)
@@ -65,7 +83,7 @@ def cell_report(path):
             if not tbls:
                 continue
             for tbl in tbls:
-                for tc in tbl.iter(_q("tc")):
+                for tc in _direct_cells(tbl):
                     addr = tc.find(_q("cellAddr"))
                     if addr is None:
                         continue
@@ -88,12 +106,14 @@ def cell_report(path):
                     capacity = estimate_chars(_int_attr(sz, "width"),
                                               _int_attr(sz, "height"),
                                               margins, font, spacing)
-                    used = len(re.sub(r"\s", "", text))
+                    used_chars = len(re.sub(r"\s", "", text))
+                    used = round(text_width_em(text), 1)
                     out.append({
                         "section": name, "table": table_index,
                         "row": _int_attr(addr, "rowAddr"),
                         "col": _int_attr(addr, "colAddr"),
                         "capacity": capacity, "used": used,
+                        "used_chars": used_chars,
                         "over": bool(capacity and used > capacity * OVER_MARGIN),
                     })
                 table_index += 1
