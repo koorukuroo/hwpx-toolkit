@@ -287,7 +287,9 @@ def cmd_lint(args):
 def cmd_guard(args):
     rules = json.loads(_read_text_utf8(args.rules)) if args.rules else None
     result = guards.guard_against_reference(
-        args.output, args.reference, rules=rules, max_growth=args.max_growth)
+        args.output, args.reference, rules=rules, max_growth=args.max_growth,
+        max_unchanged_ratio=args.max_unchanged_ratio,
+        no_default_placeholders=args.no_default_placeholders)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["ok"] else 2
 
@@ -517,6 +519,10 @@ def build_parser():
     g.add_argument("--reference", required=True)
     g.add_argument("--rules", help='{"require":[],"forbid":[],"forbid_regex":[]}')
     g.add_argument("--max-growth", type=float, default=None)
+    g.add_argument("--max-unchanged-ratio", type=float, default=None,
+                   help="원문 그대로인 긴 줄 비율 상한 (전면 재작성 검사)")
+    g.add_argument("--no-default-placeholders", action="store_true",
+                   help="기본 placeholder 패턴 검사 끄기")
     g.set_defaults(func=cmd_guard)
 
     return p

@@ -177,7 +177,29 @@ def check_package(path):
             "signals": signals}
 
 
-def guard_against_reference(output, reference, *, rules=None, max_growth=None):
+_DEFAULT_PLACEHOLDERS = [
+    r"○{2,}",
+    r"\{\{[^}]*\}\}",
+    r"<<[^>]*>>",
+    r"\bTODO\b",
+    r"\bTBD\b",
+    r"\.\s\.\s\.",
+]
+_LONG_LINE_MIN = 12
+
+
+def _long_lines(text):
+    out = set()
+    for line in text.splitlines():
+        norm = " ".join(line.split())
+        if len(re.sub(r"\s", "", norm)) >= _LONG_LINE_MIN:
+            out.add(norm)
+    return out
+
+
+def guard_against_reference(output, reference, *, rules=None, max_growth=None,
+                            max_unchanged_ratio=None,
+                            no_default_placeholders=False):
     from core.analyze import extract_text
     errors, warnings = [], []
     out_pkg = HwpxPackage.open(output)
@@ -206,6 +228,17 @@ def guard_against_reference(output, reference, *, rules=None, max_growth=None):
     for pat in rules.get("forbid_regex", []):
         if re.search(pat, text):
             errors.append(f"forbid-regex-found: {pat}")
+    for pat in rules.get("require_regex", []):
+        if not re.search(pat, text):
+            errors.append(f"require-regex-missing: {pat}")
+
+    patterns = list(rules.get("placeholder_regex", []))
+    if not no_default_placeholders:
+        patterns = _DEFAULT_PLACEHOLDERS + patterns
+    for pat in patterns:
+        m = re.search(pat, text)
+        if m:
+            errors.append(f"placeholder-found: {pat} → {m.group(0)[:30]}")
 
     ref_len = len(re.sub(r"\s", "", extract_text(reference)))
     out_len = len(re.sub(r"\s", "", text))
@@ -216,5 +249,17 @@ def guard_against_reference(output, reference, *, rules=None, max_growth=None):
     elif growth > 1.05:
         warnings.append(
             f"growth-warning: 공백 제외 글자 수 {growth:.2f}배 — 쪽수 증가 위험")
+
+    unchanged_ratio = None
+    if max_unchanged_ratio is not None:
+        ref_lines = _long_lines(extract_text(reference))
+        out_lines = list(_long_lines(text))
+        if out_lines:
+            same = sum(1 for ln in out_lines if ln in ref_lines)
+            unchanged_ratio = round(same / len(out_lines), 3)
+            if unchanged_ratio > max_unchanged_ratio:
+                errors.append(
+                    f"unchanged-too-high: {unchanged_ratio} > {max_unchanged_ratio}")
+
     return {"ok": not errors, "errors": errors, "warnings": warnings,
-            "growth": round(growth, 3)}
+            "growth": round(growth, 3), "unchanged_ratio": unchanged_ratio}
