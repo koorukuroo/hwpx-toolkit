@@ -21,7 +21,7 @@
 | paraPr | 5 | CENTER 130% — 표 셀 |
 | style | 0 | PARA "바탕글" (paraPr 0 + charPr 0) |
 
-- 템플릿 수정은 `scripts/dev/gen_base_template.py`를 고쳐 재실행한다.
+- 템플릿 수정은 `scripts/dev/gen_templates.py`를 고쳐 재실행한다.
   산출물(templates/base/*)을 직접 편집하지 않는다.
 - section0.xml을 손으로 쓸 때는 위 ID만 참조한다. 정의되지 않은
   charPrIDRef/paraPrIDRef는 validate의 dangling-ref로 잡힌다.

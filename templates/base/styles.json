@@ -1,0 +1,27 @@
+{
+  "heading": {
+    "1": [
+      "1",
+      "1"
+    ],
+    "2": [
+      "2",
+      "2"
+    ],
+    "default": [
+      "3",
+      "3"
+    ]
+  },
+  "body": [
+    "0",
+    "0"
+  ],
+  "bullet_para": "4",
+  "table": {
+    "header_char": "4",
+    "header_border": "4",
+    "body_border": "3",
+    "cell_para": "5"
+  }
+}

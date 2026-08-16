@@ -7,6 +7,7 @@ REQUIRED = [
     "mimetype", "version.xml", "settings.xml",
     "META-INF/container.xml", "META-INF/manifest.xml",
     "Contents/content.hpf", "Contents/header.xml", "Contents/section0.xml",
+    "styles.json",
 ]
 
 NS_HH = "http://www.hancom.co.kr/hwpml/2011/head"
@@ -24,7 +25,7 @@ def test_mimetype_content():
 
 def test_all_xml_files_well_formed():
     for rel in REQUIRED:
-        if rel == "mimetype":
+        if rel in ("mimetype", "styles.json"):
             continue
         ET.fromstring((BASE / rel).read_bytes())
 
@@ -70,7 +71,7 @@ def test_generator_is_idempotent():
     import subprocess, sys
     before = {rel: (BASE / rel).read_bytes() for rel in REQUIRED}
     subprocess.run([sys.executable,
-                    str(BASE.parent.parent / "scripts/dev/gen_base_template.py")],
+                    str(BASE.parent.parent / "scripts/dev/gen_templates.py")],
                    check=True)
     after = {rel: (BASE / rel).read_bytes() for rel in REQUIRED}
     assert before == after

@@ -2,7 +2,7 @@
 
 base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(validate)만으로는
 한컴 호환을 보장할 수 없으므로 아래 절차를 한컴이 설치된 환경에서 수행한다.
-템플릿(scripts/dev/gen_base_template.py)을 수정할 때마다 재수행한다.
+템플릿(scripts/dev/gen_templates.py)을 수정할 때마다 재수행한다.
 현재 상태는 하단 '검증 기록' 참조.
 
 ## 검증 절차
@@ -41,7 +41,7 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
 - 대화상자 문구/증상을 기록해 이슈로 남긴다.
 - 한컴에서 빈 문서를 .hwpx로 저장한 파일을 확보하면:
   unpack으로 header.xml/section0.xml 구조를 비교하고, 차이를
-  scripts/dev/gen_base_template.py에 반영하거나, 스펙 §8의 헤지대로
+  scripts/dev/gen_templates.py에 반영하거나, 스펙 §8의 헤지대로
   한컴 저장본을 새 base 템플릿으로 채택한다 (secPr 추출 구조라
   코드 변경 불필요).
 
@@ -79,3 +79,8 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
   탐색하도록 수정
 - 결론: Phase 4 머리말·꼬리말·쪽번호·서식 구조는 한컴 실물과 구조적으로 일치 확인.
   렌더링(육안) 확인은 여전히 미완 — 위 체크리스트 항목 참조
+
+## Phase 5 추가 검증 항목
+
+- [ ] `new --template report` 산출물: 제목 16pt 굵게, `##` 절 제목이 진남색 바 위 흰 글자로 보이는가
+- [ ] `from-hwp` 산출물이 원본 .hwp와 동일한 내용/서식으로 열리는가 (rhwp 품질)

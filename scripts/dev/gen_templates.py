@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""templates/base/* 생성기 — OWPML(KS X 6101) 지식 기반 클린룸 작성.
+"""templates/base, templates/report 생성기 — OWPML(KS X 6101) 지식 기반 클린룸 작성.
 
 템플릿을 고칠 때는 이 파일을 수정하고 재실행한다 (산출물 직접 편집 금지).
 스타일 ID 맵은 docs/superpowers/plans/2026-08-15-hwpx-toolkit-phase2.md 및
 references/base-template-styles.md 참조.
 """
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-BASE = ROOT / "templates" / "base"
 
 LANGS = ["HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER"]
 
@@ -46,9 +46,9 @@ def border_fill(bid, edge_type="NONE", width="0.1 mm", fill=None):
             f'{fill_xml}</hh:borderFill>')
 
 
-def char_pr(cid, height, font=0, bold=False):
+def char_pr(cid, height, font=0, bold=False, color="000000"):
     bold_xml = "<hh:bold/>" if bold else ""
-    return (f'<hh:charPr id="{cid}" height="{height}" textColor="#000000" '
+    return (f'<hh:charPr id="{cid}" height="{height}" textColor="#{color}" '
             'shadeColor="none" useFontSpace="0" useKerning="0" symMark="NONE" '
             'borderFillIDRef="2">'
             f'<hh:fontRef {_seven(font)}/>'
@@ -92,7 +92,31 @@ def para_pr(pid, align="JUSTIFY", spacing=160, prev=0, nxt=0, left=0):
             '</hh:paraPr>')
 
 
-def header_xml():
+def header_xml(extra_border_fills=(), extra_char_prs=(), extra_para_prs=()):
+    border_fills = [
+        border_fill(1),
+        border_fill(2),
+        border_fill(3, edge_type="SOLID", width="0.12 mm"),
+        border_fill(4, edge_type="SOLID", width="0.12 mm", fill="E6E6E6"),
+        *extra_border_fills,
+    ]
+    char_prs = [
+        char_pr(0, 1000),
+        char_pr(1, 1800, font=1, bold=True),
+        char_pr(2, 1400, font=1, bold=True),
+        char_pr(3, 1200, font=1, bold=True),
+        char_pr(4, 1000, font=1, bold=True),
+        *extra_char_prs,
+    ]
+    para_prs = [
+        para_pr(0),
+        para_pr(1, align="CENTER", prev=800, nxt=800),
+        para_pr(2, align="LEFT", prev=600, nxt=200),
+        para_pr(3, align="LEFT", prev=400, nxt=100),
+        para_pr(4, left=600),
+        para_pr(5, align="CENTER", spacing=130),
+        *extra_para_prs,
+    ]
     parts = [
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
         '<hh:head xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" '
@@ -102,29 +126,17 @@ def header_xml():
         '<hh:beginNum page="1" footnote="1" endnote="1" pic="1" tbl="1" equation="1"/>',
         '<hh:refList>',
         fontfaces(),
-        '<hh:borderFills itemCnt="4">',
-        border_fill(1),
-        border_fill(2),
-        border_fill(3, edge_type="SOLID", width="0.12 mm"),
-        border_fill(4, edge_type="SOLID", width="0.12 mm", fill="E6E6E6"),
+        f'<hh:borderFills itemCnt="{len(border_fills)}">',
+        *border_fills,
         '</hh:borderFills>',
-        '<hh:charProperties itemCnt="5">',
-        char_pr(0, 1000),
-        char_pr(1, 1800, font=1, bold=True),
-        char_pr(2, 1400, font=1, bold=True),
-        char_pr(3, 1200, font=1, bold=True),
-        char_pr(4, 1000, font=1, bold=True),
+        f'<hh:charProperties itemCnt="{len(char_prs)}">',
+        *char_prs,
         '</hh:charProperties>',
         '<hh:tabProperties itemCnt="1">'
         '<hh:tabPr id="0" autoTabLeft="0" autoTabRight="0"/>'
         '</hh:tabProperties>',
-        '<hh:paraProperties itemCnt="6">',
-        para_pr(0),
-        para_pr(1, align="CENTER", prev=800, nxt=800),
-        para_pr(2, align="LEFT", prev=600, nxt=200),
-        para_pr(3, align="LEFT", prev=400, nxt=100),
-        para_pr(4, left=600),
-        para_pr(5, align="CENTER", spacing=130),
+        f'<hh:paraProperties itemCnt="{len(para_prs)}">',
+        *para_prs,
         '</hh:paraProperties>',
         '<hh:styles itemCnt="1">'
         '<hh:style id="0" type="PARA" name="바탕글" engName="Normal" '
@@ -250,7 +262,23 @@ CONTENT_HPF = (
     '</opf:package>')
 
 
-def main():
+BASE_STYLES = {
+    "heading": {"1": ["1", "1"], "2": ["2", "2"], "default": ["3", "3"]},
+    "body": ["0", "0"], "bullet_para": "4",
+    "table": {"header_char": "4", "header_border": "4", "body_border": "3",
+              "cell_para": "5"},
+}
+REPORT_STYLES = {
+    "heading": {"1": ["5", "1"], "2": ["2", "6"], "default": ["3", "3"]},
+    "body": ["0", "0"], "bullet_para": "4",
+    "table": {"header_char": "4", "header_border": "4", "body_border": "3",
+              "cell_para": "5"},
+    "section_bar": {"char": "6", "border": "5"},
+}
+
+
+def write_template(name, header, styles):
+    tdir = ROOT / "templates" / name
     files = {
         "mimetype": "application/hwp+zip",
         "version.xml": VERSION_XML,
@@ -258,14 +286,26 @@ def main():
         "META-INF/container.xml": CONTAINER_XML,
         "META-INF/manifest.xml": MANIFEST_XML,
         "Contents/content.hpf": CONTENT_HPF,
-        "Contents/header.xml": header_xml(),
+        "Contents/header.xml": header,
         "Contents/section0.xml": section0_xml(),
+        "styles.json": json.dumps(styles, ensure_ascii=False, indent=2) + "\n",
     }
     for rel, text in files.items():
-        path = BASE / rel
+        path = tdir / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-    print(f"wrote {len(files)} files to {BASE}")
+    print(f"wrote {len(files)} files to {tdir}")
+
+
+def main():
+    write_template("base", header_xml(), BASE_STYLES)
+    write_template("report", header_xml(
+        extra_border_fills=[border_fill(5, edge_type="SOLID", width="0.12 mm",
+                                        fill="1F3864")],
+        extra_char_prs=[char_pr(5, 1600, font=1, bold=True),
+                        char_pr(6, 1200, font=1, bold=True, color="FFFFFF")],
+        extra_para_prs=[para_pr(6, align="LEFT", prev=600, nxt=200)],
+    ), REPORT_STYLES)
 
 
 if __name__ == "__main__":

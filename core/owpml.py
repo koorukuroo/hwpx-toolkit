@@ -1,4 +1,5 @@
 """OWPML 요소 빌더 — 문자열 기반 XML 조각 생성."""
+import json
 from xml.sax.saxutils import escape as xml_escape
 
 from core.template import TEMPLATES_DIR
@@ -32,6 +33,13 @@ def sec_document(first_para, body_parts, sec_open):
             + sec_open + first_para + "".join(body_parts) + "</hs:sec>")
 
 
+def load_style_map(template="base"):
+    p = TEMPLATES_DIR / template / "styles.json"
+    if not p.is_file():
+        raise ValueError(f"styles.json 없음: {template}")
+    return json.loads(p.read_text("utf-8"))
+
+
 def _para(pid, text, char_pr, para_pr, page_break):
     pb = "1" if page_break else "0"
     return (f'<hp:p {NS_HP_DECL} id="{pid}" paraPrIDRef="{para_pr}" styleIDRef="0" '
@@ -52,8 +60,12 @@ def empty_line(alloc):
 _HEADING_MAP = {1: ("1", "1"), 2: ("2", "2")}
 
 
-def heading_para(level, text, alloc):
-    char_pr, para_pr = _HEADING_MAP.get(level, ("3", "3"))
+def heading_para(level, text, alloc, style_map=None):
+    if style_map is None:
+        char_pr, para_pr = _HEADING_MAP.get(level, ("3", "3"))
+    else:
+        h = style_map["heading"]
+        char_pr, para_pr = h.get(str(level), h["default"])
     return _para(alloc.next(), xml_escape(text), char_pr, para_pr, False)
 
 
@@ -80,6 +92,27 @@ def _cell(row, col, text, width, height, alloc, *, header_cell):
         f'<hp:cellSz width="{width}" height="{height}"/>'
         '<hp:cellMargin left="141" right="141" top="141" bottom="141"/>'
         '</hp:tc>')
+
+
+def section_bar(text, alloc, style_map, total_width=42520, height=1200):
+    sb = style_map["section_bar"]
+    cell = _cell(0, 0, text, total_width, height, alloc, header_cell=False)
+    cell = cell.replace('borderFillIDRef="3"', f'borderFillIDRef="{sb["border"]}"', 1)
+    cell = cell.replace('charPrIDRef="0"', f'charPrIDRef="{sb["char"]}"', 1)
+    tbl_id = alloc.next()
+    return (
+        f'<hp:p id="{alloc.next()}" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+        'columnBreak="0" merged="0"><hp:run charPrIDRef="0">'
+        f'<hp:tbl id="{tbl_id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" '
+        'textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" '
+        f'repeatHeader="0" rowCnt="1" colCnt="1" cellSpacing="0" borderFillIDRef="{sb["border"]}" noAdjust="0">'
+        f'<hp:sz width="{total_width}" widthRelTo="ABSOLUTE" height="{height}" heightRelTo="ABSOLUTE" protect="0"/>'
+        '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
+        'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" '
+        'horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
+        '<hp:outMargin left="0" right="0" top="283" bottom="141"/>'
+        '<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
+        f'<hp:tr>{cell}</hp:tr></hp:tbl></hp:run></hp:p>')
 
 
 def table(rows, alloc, *, header=True, total_width=42520, row_height=2400):

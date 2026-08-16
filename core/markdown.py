@@ -104,19 +104,25 @@ def first_heading(text):
 
 def render_to_section(md_text, template="base"):
     first, sec_open = owpml.load_skeleton(template)
+    style = owpml.load_style_map(template)
     alloc = owpml.IdAllocator()
     parts = []
     for block in parse_markdown(md_text):
         if block["type"] == "heading":
-            parts.append(owpml.heading_para(block["level"], block["text"], alloc))
+            if block["level"] == 2 and "section_bar" in style:
+                parts.append(owpml.section_bar(block["text"], alloc, style))
+            else:
+                parts.append(owpml.heading_para(block["level"], block["text"], alloc,
+                                                 style_map=style))
         elif block["type"] == "paragraph":
-            parts.append(owpml.text_para(block["text"], alloc))
+            parts.append(owpml.text_para(block["text"], alloc,
+                                          char_pr=style["body"][0], para_pr=style["body"][1]))
         elif block["type"] == "bullet":
             for item in block["items"]:
                 parts.append(owpml.bullet_para(item, alloc))
         elif block["type"] == "ordered":
             for item in block["items"]:
-                parts.append(owpml.text_para(item, alloc, para_pr="4"))
+                parts.append(owpml.text_para(item, alloc, para_pr=style["bullet_para"]))
         elif block["type"] == "table":
             parts.append(owpml.table(block["rows"], alloc))
     return owpml.sec_document(first, parts, sec_open)
