@@ -60,7 +60,7 @@ def lint_text(text):
             _add(findings, "amount-hangul", i, line,
                  "금액은 아라비아 숫자 뒤 괄호에 한글 병기",
                  f"금{m.group(1)}원(금…원)")
-        line_no_url = _URL.sub("", line)
+        line_no_url = _URL.sub("URL", line)
         if _COLON_LEFT_SPACE.search(line_no_url):
             _add(findings, "colon-spacing", i, line, "쌍점 왼쪽은 붙이고 오른쪽만 한 칸")
         stripped_times = _TIME_OK.sub("", line_no_url)

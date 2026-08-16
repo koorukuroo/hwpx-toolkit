@@ -54,6 +54,11 @@ def test_colon_spacing_ignores_urls():
     assert "colon-spacing" not in _rules("https://www.example.go.kr 참고")
 
 
+def test_colon_spacing_still_flags_violation_next_to_url():
+    assert "colon-spacing" in _rules("링크:http://a.kr")
+    assert "colon-spacing" not in _rules("참고: https://gov.kr")
+
+
 def test_item_hierarchy_ignores_proviso_lines():
     assert "item-hierarchy" not in _rules("단. 부득이한 사유가 있는 경우")
     assert "item-hierarchy" not in _rules("주. 상기 내용은 예시임.")
