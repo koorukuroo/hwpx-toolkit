@@ -4,7 +4,8 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from core.package import HwpxPackage, PackageError
+from core.errors import PackageError, EditError  # noqa: F401 (재노출)
+from core.package import HwpxPackage
 
 NS = {
     "hs": "http://www.hancom.co.kr/hwpml/2011/section",
@@ -20,10 +21,6 @@ _XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 
 def _q(tag):
     return f"{{{NS['hp']}}}{tag}"
-
-
-class EditError(PackageError):
-    pass
 
 
 _PAGE_SIZES = {"a4": (59528, 84186), "a3": (84186, 119055),
@@ -743,7 +740,13 @@ class SectionEditor:
             p.remove(run)
         if not p.findall(_q("run")):
             gp = parents[p]
-            gp.remove(p)
+            if gp.tag == _q("subList"):
+                # 셀 내부: 빈 subList를 만들지 않도록 빈 run을 남긴다
+                run = ET.SubElement(p, _q("run"), {"charPrIDRef": "0"})
+                ET.SubElement(run, _q("t"))
+                self._mark(p)
+            else:
+                gp.remove(p)
         else:
             self._mark(p)
 

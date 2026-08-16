@@ -11,7 +11,8 @@ def test_check_passes_clean_document(tmp_path):
     r = check_package(p)
     assert r["ok"], r["errors"]
     assert r["signals"] == {"char_border_bug": False,
-                            "vertical_misconvert": False}
+                            "vertical_misconvert": False,
+                            "image_ref_broken": False}
 
 
 def test_check_detects_char_border_bug(tmp_path):

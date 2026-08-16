@@ -3,7 +3,8 @@ import re
 import zipfile
 import xml.etree.ElementTree as ET
 
-from core.package import HwpxPackage, PackageError, section_names
+from core.errors import PackageError
+from core.package import HwpxPackage, section_names
 
 REQUIRED_ENTRIES = ("mimetype", "version.xml", "Contents/header.xml",
                     "Contents/content.hpf")
@@ -105,7 +106,8 @@ def validate_package(path):
 
 def check_package(path):
     base = validate_package(path)
-    signals = {"char_border_bug": False, "vertical_misconvert": False}
+    signals = {"char_border_bug": False, "vertical_misconvert": False,
+               "image_ref_broken": False}
     errors = list(base["errors"])
     warnings = list(base["warnings"])
     try:
@@ -138,6 +140,27 @@ def check_package(path):
             signals["vertical_misconvert"] = True
             errors.append(
                 "vertical-misconvert: 셀 과반이 세로쓰기 — 오변환 여부 확인 필요")
+
+        # 이미지 참조 정합: hc:img@binaryItemIDRef ↔ content.hpf manifest ↔ 엔트리
+        hpf = pkg.read_text("Contents/content.hpf")
+        manifest = {}
+        for m in re.finditer(r"<opf:item\b[^>]*>", hpf):
+            tag = m.group(0)
+            id_m = re.search(r'\bid="([^"]*)"', tag)
+            href_m = re.search(r'\bhref="([^"]*)"', tag)
+            if id_m and href_m:
+                manifest[id_m.group(1)] = href_m.group(1)
+        names_set = set(pkg.names())
+        NS_HC = "http://www.hancom.co.kr/hwpml/2011/core"
+        for name in section_names(pkg.names()):
+            sec_root = ET.fromstring(pkg.read(name))
+            for img in sec_root.iter(f"{{{NS_HC}}}img"):
+                ref = img.get("binaryItemIDRef")
+                href = manifest.get(ref)
+                if ref is None or href is None or href not in names_set:
+                    signals["image_ref_broken"] = True
+                    errors.append(
+                        f"image-ref-broken: {ref} (manifest/BinData 불일치)")
     except (PackageError, ET.ParseError):
         pass  # 구조 오류는 validate가 이미 errors에 보고
     return {"ok": not errors, "errors": errors, "warnings": warnings,

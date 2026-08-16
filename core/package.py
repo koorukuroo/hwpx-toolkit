@@ -6,14 +6,7 @@ import zipfile
 import zlib
 from pathlib import Path
 
-
-class PackageError(Exception):
-    pass
-
-
-class UnsupportedZipError(PackageError):
-    pass
-
+from core.errors import PackageError, UnsupportedZipError  # noqa: F401 (재노출)
 
 _EOCD_SIG = b"PK\x05\x06"
 _CENTRAL_SIG = b"PK\x01\x02"

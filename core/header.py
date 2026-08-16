@@ -2,7 +2,8 @@
 import copy
 import xml.etree.ElementTree as ET
 
-from core.edit import EditError, NS, _XML_DECL
+from core.edit import NS, _XML_DECL
+from core.errors import EditError
 
 NS_HH = NS["hh"]
 NS_HC = NS["hc"]

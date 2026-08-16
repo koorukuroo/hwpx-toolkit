@@ -2,7 +2,7 @@
 import re
 import struct
 
-from core.edit import EditError
+from core.errors import EditError
 
 MM_PER_INCH = 25.4
 HWP_PER_MM = 283.5
@@ -10,6 +10,8 @@ HWP_PER_MM = 283.5
 
 def image_size(data):
     if data[:8] == b"\x89PNG\r\n\x1a\n":
+        if len(data) < 24:
+            raise EditError("잘린 PNG (IHDR 없음)")
         w, h = struct.unpack(">II", data[16:24])
         return w, h, "png"
     if data[:2] == b"\xff\xd8":
@@ -19,6 +21,9 @@ def image_size(data):
                 i += 1
                 continue
             marker = data[i + 1]
+            if marker == 0xFF:          # 패딩 바이트
+                i += 1
+                continue
             if marker in (0xC0, 0xC1, 0xC2):
                 h, w = struct.unpack(">HH", data[i + 5:i + 9])
                 return w, h, "jpg"
