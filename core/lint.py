@@ -31,7 +31,7 @@ _DATE_PADDED = re.compile(r"\b(\d{4})\.\s*(0\d|\d{1,2})\.\s*(0\d|\d{1,2})\.")
 _YEAR_2DIGIT = re.compile(r"(?<![\d:.])(\d{2})\.\s*(\d{1,2})\.\s*(\d{1,2})\.")
 _AMOUNT_ABBREV = re.compile(r"[\d,]+\s*(천원|백만원|억원|만원)")
 _ATTACH_COLON = re.compile(r"붙임\s*:")
-_RANGE_TILDE = re.compile(r"[~∼]")
+_RANGE_REDUNDANT = re.compile(r"[~∼][^,;，；]{0,20}까지")
 _FOREIGN_ORDER = re.compile(r"(?<![\w/])([A-Z]{2,})\(([가-힣]{2,})\)")
 
 
@@ -81,7 +81,7 @@ def lint_text(text):
         if _ATTACH_COLON.search(line):
             _add(findings, "attach-colon", i, line,
                  "'붙임' 뒤에는 쌍점 없이 두 칸 띄운다", "붙임  ")
-        if _RANGE_TILDE.search(line) and "까지" in line:
+        if _RANGE_REDUNDANT.search(line):
             _add(findings, "range-redundant", i, line,
                  "물결표 범위와 '까지'는 함께 쓰지 않는다")
         line_no_url = _URL.sub("URL", line)

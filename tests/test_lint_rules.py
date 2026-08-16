@@ -39,6 +39,13 @@ def test_range_redundant():
     assert "range-redundant" not in _rules("2026. 8. 16.까지 접수")
 
 
+def test_range_redundant_not_mere_cooccurrence():
+    assert "range-redundant" not in _rules(
+        "지원등급은 A~C 등급으로 나뉘며, 신청은 3월 말까지 받는다.")
+    assert "range-redundant" in _rules("2026. 8. 1.~2026. 8. 16.까지 접수")
+    assert "range-redundant" not in _rules("8. 1.~8. 16. 접수")
+
+
 def test_foreign_order():
     assert "foreign-order" in _rules("AI(인공지능) 기반 서비스")
     assert _find("AI(인공지능) 기반", "foreign-order")["suggest"] == "인공지능(AI)"
