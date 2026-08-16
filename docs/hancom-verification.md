@@ -63,7 +63,7 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
 
 ### 2026-08-16 — Phase 4 구조 실물 대조 (한컴 저작 hwpx 2건, 최종 리뷰)
 
-- 대조 표본: 한컴에서 직접 작성·저장한 hwpx 2건 (~/project/project2026/hansol/*.hwpx, 읽기 전용)
+- 대조 표본: 한컴에서 직접 작성·저장한 hwpx 2건 (한컴에서 직접 작성·저장한 로컬 표본, 읽기 전용)
 - 방법: unzip 후 header.xml/section0.xml을 툴킷 산출물과 XML 구조 직접 비교(렌더링 확인 아님)
 - **발견 1**: `hh:charPr` 자식 순서가 실물은 `offset, italic, bold, underline, strikeout,
   outline, shadow`인데 툴킷은 `offset, bold, italic`로 반전되어 있었음 → `core/header.py`

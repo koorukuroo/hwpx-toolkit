@@ -114,7 +114,7 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
     한쪽 이상 지정 필요), 한쪽만 주면 비율 유지. replace-image는 기존 BinData를
     남기고 새 항목을 추가한다.
 12. merge-cells/add-col도 병합 셀이 이미 있는 표에서는 거부된다. 머리말·꼬리말·
-    쪽번호 구조는 한컴 실물(hansol 표본)로 검증됨(docs/hancom-verification.md,
+    쪽번호 구조는 한컴 저장 문서와 구조 대조로 검증됨(docs/hancom-verification.md,
     references/owpml-format.md). 모든 편집 커맨드는 section0만 대상으로 한다
     (다중 섹션 편집은 아직 미지원, 추후 로드맵).
 13. .hwp는 사용자가 HWPX 변환을 명시적으로 요청한 경우에만 from-hwp로 변환한다.

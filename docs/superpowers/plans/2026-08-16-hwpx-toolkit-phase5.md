@@ -1001,5 +1001,5 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ## Phase 5 이후
 
 - 한컴 검증(Phase 4·5 항목) 사용자 1회 수행.
-- Phase 4b(연기 항목: 각주·하이퍼링크·책갈피·도형·글상자)는 hansol 실물 표본에 해당 구조가 있으면 근거 있게 진행 가능.
+- Phase 4b(연기 항목: 각주·하이퍼링크·책갈피·도형·글상자)는 한컴 실물 표본에 해당 구조가 있으면 근거 있게 진행 가능.
 - LICENSE 저작권 명의 확정.

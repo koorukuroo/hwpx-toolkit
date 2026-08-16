@@ -94,7 +94,7 @@ def _charpr_tags(he, char_id):
 
 
 def test_clone_char_pr_italic_bold_order_matches_schema():
-    # 실제 한컴 문서(hansol 실물)의 charPr 순서는 offset, italic, bold,
+    # 실제 한컴 문서(한컴 실물 문서)의 charPr 순서는 offset, italic, bold,
     # underline, strikeout, outline, shadow — bold/italic을 함께 추가할 때
     # 반복마다 offset을 다시 찾으면 순서가 bold, italic으로 뒤집히는 회귀를
     # 방지한다.

@@ -63,6 +63,6 @@ base 템플릿과 report 템플릿은 서로 다른 스타일 맵을 가지며,
   @id="0" @applyPageType > hp:subList > hp:p`. 쪽번호는 그 문단의 run에
   `hp:run > hp:ctrl > hp:autoNum @numType="PAGE" > hp:autoNumFormat`, ctrl 뒤에
   빈 `hp:t`가 온다 (autoNum이 ctrl 없이 run 바로 밑에 오면 잘못된 구조).
-  (2026-08-16 한컴 실물(hansol 표본 2건)에서 확인)
+  (2026-08-16 한컴 저장 문서 2건에서 확인)
 - **스타일 추가**: header.xml의 charPr/paraPr를 복제·변형해 끝에 추가하고 itemCnt 갱신.
   기존 id는 절대 재사용하지 않는다.
