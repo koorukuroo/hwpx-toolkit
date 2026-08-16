@@ -127,9 +127,9 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
 15. check가 `char-border-bug`를 보고하면 `fix-borders`로 수리한 뒤 다시 check한다.
     수리는 header.xml만 바꾸므로 본문은 그대로다.
 16. check의 `cell-overflow-risk` 경고는 추정이라 ok를 막지 않는다. 양식을 채울 때는
-    `fill --analyze`가 알려주는 각 타겟의 `capacity`(추정 수용 글자 수, **em 단위**:
-    ASCII 0.5em, 한글 1em)를 보고 값 길이를 맞추거나, 넘칠 수밖에 없으면 사용자에게 알린다.
-    경고는 동시에 일반 문자 수도 표시한다.
+    `fill --analyze`가 알려주는 각 타겟의 `capacity`(셀의 em 단위 수용량)를 보고,
+    채울 값의 길이를 ASCII 0.5em·한글 1em으로 환산해 비교한다(경고는 환산값과 실제 문자 수를 함께 표시).
+    넘칠 수밖에 없으면 사용자에게 알린다.
 17. 문서 전체를 새 관점으로 재작성하는 작업(기관 교체 등)은 guard에
     `--max-unchanged-ratio 0.35`를 붙여 원문이 그대로 남지 않았는지 확인한다.
     guard는 `○○`, `{{...}}`, `<<>>`, `TODO`, `TBD`, `. . .` 같은 미완성 표시도

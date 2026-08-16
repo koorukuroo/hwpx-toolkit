@@ -56,7 +56,7 @@ ln -s "$(pwd)" ~/.claude/skills/hwpx-toolkit
 | `analyze <file> [--slots]` | 페이지 설정·스타일 수·표 구조 리포트. `--slots`는 편집 가능한 문단/셀 목록 |
 | `validate <file>` | ZIP·XML 구조와 ID 참조 정합성 검증 |
 | `check <file>` | **전달 전 필수 게이트** — validate + 한컴 사고 패턴(글자 테두리 버그, 세로쓰기 오변환, 깨진 이미지 참조) 검출 |
-| `guard <out> --reference <원본> [--rules r.json] [--max-growth 1.1] [--max-unchanged-ratio 0.35] [--no-default-placeholders]` | 원본 대비 검사 — 비변경 엔트리 바이트 동일, 필수/금지 키워드, 미완성 표시(`○○`·`{{}}`·`<<>>`·TODO·TBD), 글자 수 증가, 원문 잔존 비율 |
+| `guard <out> --reference <원본> [--rules r.json] [--max-growth 1.1] [--max-unchanged-ratio 0.35] [--no-default-placeholders]` | 원본 대비 검사 — 비변경 엔트리 바이트 동일, 필수/금지 키워드, 미완성 표시(`○○`·`{{}}`·`<<>>`·`. . .`·TODO·TBD), 글자 수 증가, 원문 잔존 비율 |
 | `unpack <file> <dir>` / `pack <dir> <out> [--source 원본]` | ZIP 해체·재조립 (XML 직접 수정용, `--source`로 바이트 보존) |
 
 ### 생성
@@ -186,7 +186,7 @@ python3 scripts/hwpx.py lint 공고문.hwpx                     # 표기 검수
 ## 개발
 
 ```bash
-python3 -m pytest tests/ -v          # 163개 테스트
+python3 -m pytest tests/ -v          # 197개 테스트 (1개는 실물 .hwp 환경 필요)
 python3 scripts/dev/gen_templates.py # 템플릿 재생성 (base, report)
 ```
 
