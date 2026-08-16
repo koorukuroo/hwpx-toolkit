@@ -14,6 +14,7 @@ from core import edit as edit_mod  # noqa: E402
 from core import fill as fill_mod  # noqa: E402
 from core import lint as lint_mod  # noqa: E402
 from core import markdown as md_mod  # noqa: E402
+from core import repair as repair_mod  # noqa: E402
 from core.package import HwpxPackage, PackageError, pack_dir  # noqa: E402
 from core.template import build_from_template  # noqa: E402
 
@@ -257,6 +258,11 @@ def cmd_set_pagenum(args):
     return _finish_edited(args.dst, {"pagenum": args.where})
 
 
+def cmd_fix_borders(args):
+    report = repair_mod.fix_char_borders(args.src, args.dst)
+    return _finish_edited(args.dst, report)
+
+
 def cmd_check(args):
     result = guards.check_package(args.file)
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -485,6 +491,11 @@ def build_parser():
     pn.add_argument("--where", choices=["header", "footer"], default="footer")
     pn.add_argument("--align", choices=["left", "center", "right"], default="center")
     pn.set_defaults(func=cmd_set_pagenum)
+
+    fb = sub.add_parser("fix-borders", help="글자 테두리 버그 수리 (check 검출 시)")
+    fb.add_argument("src")
+    fb.add_argument("dst")
+    fb.set_defaults(func=cmd_fix_borders)
 
     ck = sub.add_parser("check", help="전달 전 필수 게이트 (validate + 사고 패턴)")
     ck.add_argument("file")
