@@ -26,7 +26,7 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
      ├─ "문단 추가" → add-para
      ├─ "파일 정상 확인" → check (편집 후엔 guard --reference 원본 병행)
      ├─ "XML 직접 수정" → unpack → 편집 → pack --source
-     ├─ .hwp 파일 + "HWPX로 변환해줘"(명시) → from-hwp → check 통과 후 전달
+     ├─ .hwp 파일 + "HWPX로 변환해줘"(명시) → from-hwp(자동 check) → 통과 시 전달
      ├─ .hwp 파일 + 그 외 요청 → 변환 여부 먼저 확인 (자동 변환 금지)
      ├─ "공문서 작성법 검수/맞춤법 표기 확인" → lint
      └─ "보고서 양식으로 만들어줘" → new --template report
@@ -114,7 +114,7 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
 12. merge-cells/add-col도 병합 셀이 이미 있는 표에서는 거부된다. 머리말·꼬리말·
     쪽번호 구조는 한컴 실물(hansol 표본)로 검증됨(docs/hancom-verification.md,
     references/owpml-format.md). 모든 편집 커맨드는 section0만 대상으로 한다
-    (다중 섹션 문서의 다른 섹션은 Phase 5).
+    (다중 섹션 편집은 아직 미지원, 추후 로드맵).
 13. .hwp는 사용자가 HWPX 변환을 명시적으로 요청한 경우에만 from-hwp로 변환한다.
     변환본은 별도 파일이며 원본 .hwp는 건드리지 않는다. Node.js가 없으면 설치를
     안내하고, 다른 커맨드는 그대로 쓸 수 있다.

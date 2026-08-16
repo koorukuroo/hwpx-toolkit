@@ -8,21 +8,21 @@
 | borderFill | 2 | 테두리 없음 (charPr/paraPr 참조용) |
 | borderFill | 3 | SOLID 0.12mm 4면 (표 본문 셀) |
 | borderFill | 4 | SOLID 0.12mm 4면 + #E6E6E6 배경 (표 헤더 셀) |
+| borderFill | 5 | SOLID 0.12mm 4면 + #1F3864 배경 (report 템플릿 section-bar) |
 | charPr | 0 | 10pt(1000) 바탕 본문 |
 | charPr | 1 | 18pt(1800) 돋움 볼드 — 문서 제목(H1) |
 | charPr | 2 | 14pt(1400) 돋움 볼드 — H2 |
 | charPr | 3 | 12pt(1200) 돋움 볼드 — H3 이하 |
 | charPr | 4 | 10pt(1000) 돋움 볼드 — 표 헤더 |
 | charPr | 5 | 16pt(1600) 돋움 볼드 — report 템플릿 H1 제목 |
-| charPr | 6 | 10pt(1000) 돋움 볼드 흰색 — report 템플릿 section-bar 텍스트 |
+| charPr | 6 | 12pt(1200) 돋움 볼드 흰색(#FFFFFF) — 섹션 바 글자 |
 | paraPr | 0 | JUSTIFY 160% 본문 |
 | paraPr | 1 | CENTER 160%, prev/next 800 — 제목(H1) |
 | paraPr | 2 | LEFT 160%, prev 600 next 200 — H2 |
 | paraPr | 3 | LEFT 160%, prev 400 next 100 — H3 이하 |
 | paraPr | 4 | JUSTIFY 160%, left 600 — 목록 |
 | paraPr | 5 | CENTER 130% — 표 셀 |
-| paraPr | 6 | CENTER 130% — report 템플릿 section-bar |
-| borderFill | 5 | SOLID 0.12mm #1F3864 — report 템플릿 section-bar 배경 |
+| paraPr | 6 | LEFT 160%, prev 600 next 200 — 섹션 바용 |
 | style | 0 | PARA "바탕글" (paraPr 0 + charPr 0) |
 
 - 템플릿 수정은 `scripts/dev/gen_templates.py`를 고쳐 재실행한다.
