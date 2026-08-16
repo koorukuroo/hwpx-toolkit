@@ -27,6 +27,12 @@ _COLON_LEFT_SPACE = re.compile(r"\S\s+:\s")
 _COLON_NO_RIGHT = re.compile(r"[가-힣A-Za-z)\]]:(?=\S)(?!\d{2}\b)")
 _TIME_OK = re.compile(r"\b\d{1,2}:\d{2}\b")
 _URL = re.compile(r"\w+://\S+")
+_DATE_PADDED = re.compile(r"\b(\d{4})\.\s*(0\d|\d{1,2})\.\s*(0\d|\d{1,2})\.")
+_YEAR_2DIGIT = re.compile(r"(?<![\d:.])(\d{2})\.\s*(\d{1,2})\.\s*(\d{1,2})\.")
+_AMOUNT_ABBREV = re.compile(r"[\d,]+\s*(천원|백만원|억원|만원)")
+_ATTACH_COLON = re.compile(r"붙임\s*:")
+_RANGE_TILDE = re.compile(r"[~∼]")
+_FOREIGN_ORDER = re.compile(r"(?<![\w/])([A-Z]{2,})\(([가-힣]{2,})\)")
 
 
 def _add(findings, rule, lineno, text, message, suggest=None):
@@ -60,7 +66,29 @@ def lint_text(text):
             _add(findings, "amount-hangul", i, line,
                  "금액은 아라비아 숫자 뒤 괄호에 한글 병기",
                  f"금{m.group(1)}원(금…원)")
+        for m in _DATE_PADDED.finditer(line):
+            y, mo, d = m.group(1), m.group(2), m.group(3)
+            if mo.startswith("0") or d.startswith("0"):
+                _add(findings, "date-padding", i, line,
+                     "월·일은 0을 붙이지 않는다",
+                     f"{y}. {int(mo)}. {int(d)}.")
+        for m in _YEAR_2DIGIT.finditer(line):
+            _add(findings, "year-2digit", i, line,
+                 "연도는 4자리로 쓴다", f"20{m.group(1)}. {int(m.group(2))}. {int(m.group(3))}.")
+        for m in _AMOUNT_ABBREV.finditer(line):
+            _add(findings, "amount-abbrev", i, line,
+                 f"금액 단위 약어('{m.group(1)}') 대신 아라비아 숫자로 전액 표기")
+        if _ATTACH_COLON.search(line):
+            _add(findings, "attach-colon", i, line,
+                 "'붙임' 뒤에는 쌍점 없이 두 칸 띄운다", "붙임  ")
+        if _RANGE_TILDE.search(line) and "까지" in line:
+            _add(findings, "range-redundant", i, line,
+                 "물결표 범위와 '까지'는 함께 쓰지 않는다")
         line_no_url = _URL.sub("URL", line)
+        for m in _FOREIGN_ORDER.finditer(line_no_url):
+            _add(findings, "foreign-order", i, line,
+                 "한글을 먼저 쓰고 외국어를 괄호 안에 넣는다",
+                 f"{m.group(2)}({m.group(1)})")
         if _COLON_LEFT_SPACE.search(line_no_url):
             _add(findings, "colon-spacing", i, line, "쌍점 왼쪽은 붙이고 오른쪽만 한 칸")
         stripped_times = _TIME_OK.sub("", line_no_url)
