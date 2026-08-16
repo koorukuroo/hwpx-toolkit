@@ -1,8 +1,13 @@
+import zipfile
 from core.capacity import estimate_chars, cell_report, for_cell, OVER_MARGIN, text_width_em
 from core.analyze import fill_targets
 from core.guards import check_package
 from core.edit import edit_file
-from tests.fixture import build_form_hwpx, build_minimal_hwpx, SECTION_HEAD, _table
+from tests.fixture import (
+    build_form_hwpx, build_minimal_hwpx, SECTION_HEAD, _table,
+    MIMETYPE, VERSION_XML, SETTINGS_XML, CONTAINER_XML, MANIFEST_XML,
+    CONTENT_HPF, HEADER_XML,
+)
 from tests.test_fill import _NESTED_OUTER_TABLE, _pack_section0
 
 M141 = {"left": 141, "right": 141, "top": 141, "bottom": 141}
@@ -79,6 +84,74 @@ def test_no_false_overflow_on_clean_fixtures(tmp_path):
 
 def test_margin_constant_is_lenient():
     assert OVER_MARGIN >= 1.1
+
+
+def test_estimate_chars_zero_when_geometry_unknown():
+    # 가용 폭/높이가 0 이하(여백이 셀 크기를 넘어서는 등 기하가 불명확한
+    # 경우)면 "추정 불가"를 뜻하는 0을 반환해야 한다. 예전 로직은
+    # max(1, ...)로 음수를 1로 눌러 놓아 "1자는 들어간다"는 거짓 확신을 줬다.
+    assert estimate_chars(0, 0, M141, 1000, 160) == 0
+    assert estimate_chars(100, 100, M141, 1000, 160) == 0    # 여백이 셀보다 큼
+
+
+_NO_CELLSZ_TABLE = (
+    '<hp:p id="4000000001" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+    'columnBreak="0" merged="0"><hp:run charPrIDRef="0">'
+    '<hp:tbl id="4000000002" zOrder="0" numberingType="TABLE" '
+    'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
+    'dropcapstyle="None" pageBreak="CELL" repeatHeader="0" '
+    'rowCnt="1" colCnt="1" cellSpacing="0" borderFillIDRef="1" noAdjust="0">'
+    '<hp:sz width="21260" widthRelTo="ABSOLUTE" height="2400" '
+    'heightRelTo="ABSOLUTE" protect="0"/>'
+    '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" '
+    'allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" '
+    'horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" '
+    'vertOffset="0" horzOffset="0"/>'
+    '<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
+    '<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
+    '<hp:tr><hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" '
+    'dirty="0" borderFillIDRef="1">'
+    '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" '
+    'vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" '
+    'textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+    '<hp:p id="4000000003" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+    'columnBreak="0" merged="0"><hp:run charPrIDRef="0">'
+    '<hp:t>내용</hp:t></hp:run></hp:p>'
+    '</hp:subList>'
+    '<hp:cellAddr colAddr="0" rowAddr="0"/>'
+    '<hp:cellSpan colSpan="1" rowSpan="1"/>'
+    '<hp:cellMargin left="141" right="141" top="141" bottom="141"/>'
+    '</hp:tc></hp:tr></hp:tbl></hp:run></hp:p>'
+)
+
+
+def test_cell_report_no_cellsz_reports_zero_capacity(tmp_path):
+    # cellSz가 없는 셀(예: 일부 실물 문서의 병합/특수 셀)은 폭·높이를
+    # 알 수 없으므로 capacity 0, over False로 보고해야 한다(경고 오탐 방지).
+    section0 = SECTION_HEAD + _NO_CELLSZ_TABLE + "</hs:sec>"
+    path = _pack_section0(tmp_path / "no_cellsz.hwpx", section0)
+    cells = cell_report(path)["cells"]
+    assert len(cells) == 1
+    assert cells[0]["capacity"] == 0
+    assert cells[0]["over"] is False
+
+
+def test_check_caps_overflow_warnings_at_20_with_summary_line(tmp_path):
+    # cell-overflow-risk 경고는 20건까지만 개별 표시하고, 그 이상은
+    # "외 N건 더" 요약 한 줄로 묶는다.
+    rows = [[f"라벨{i}", "가" * 60] for i in range(25)]
+    overflow_table = _table(rows=rows)
+    section0 = SECTION_HEAD + overflow_table + "</hs:sec>"
+    path = _pack_section0(tmp_path / "many_overflow.hwpx", section0)
+
+    cells = cell_report(path)["cells"]
+    over = [c for c in cells if c["over"]]
+    assert len(over) == 25                     # 25개 셀 모두 넘침
+
+    r = check_package(path)
+    overflow_msgs = [w for w in r["warnings"] if w.startswith("cell-overflow-risk")]
+    assert len(overflow_msgs) == 21             # 20건 개별 + 요약 1줄
+    assert overflow_msgs[-1] == "cell-overflow-risk: 외 5건 더"
 
 
 def test_cell_report_ignores_nested_table_cells(tmp_path):

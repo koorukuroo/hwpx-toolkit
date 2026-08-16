@@ -63,6 +63,50 @@ def test_repair_preserves_other_entries(tmp_path):
             assert a.read(name) == b.read(name), name
 
 
+def test_repair_reuses_existing_borderless_fill(tmp_path):
+    """실물 문서에서는 header.xml에 무테두리 borderFill이 이미 있고, charPr가
+    다른(실선) borderFill을 참조하도록 망가진 경우가 많다. 이 경로는 새
+    borderFill을 만들지 않고 기존 것을 재사용해야 한다 (created=False)."""
+    src = build_minimal_hwpx(tmp_path / "src.hwpx")
+    pkg = HwpxPackage.open(src)
+    header = pkg.read_text("Contents/header.xml")
+
+    solid_fill = (
+        '<hh:borderFill id="2" threeD="0" shadow="0" centerLine="NONE" '
+        'breakCellSeparateLine="0">'
+        '<hh:slash type="NONE" Crooked="0" isCounter="0"/>'
+        '<hh:backSlash type="NONE" Crooked="0" isCounter="0"/>'
+        '<hh:leftBorder type="SOLID" width="0.1 mm" color="#000000"/>'
+        '<hh:rightBorder type="SOLID" width="0.1 mm" color="#000000"/>'
+        '<hh:topBorder type="SOLID" width="0.1 mm" color="#000000"/>'
+        '<hh:bottomBorder type="SOLID" width="0.1 mm" color="#000000"/>'
+        '<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/>'
+        '</hh:borderFill>'
+    )
+    # id="1"(무테두리)은 그대로 두고, id="2"(실선)를 추가한 뒤 charPr가
+    # id="2"를 참조하도록 망가뜨린다.
+    assert header.count('<hh:borderFills itemCnt="1">') == 1
+    header = header.replace('<hh:borderFills itemCnt="1">',
+                            '<hh:borderFills itemCnt="2">', 1)
+    header = header.replace('</hh:borderFills>', solid_fill + '</hh:borderFills>', 1)
+    assert header.count('borderFillIDRef="1">') == 1
+    header = header.replace('borderFillIDRef="1">', 'borderFillIDRef="2">', 1)
+
+    bad = tmp_path / "bad.hwpx"
+    pkg.write_replaced(bad, {"Contents/header.xml": header.encode("utf-8")})
+    assert check_package(bad)["signals"]["char_border_bug"] is True
+
+    out = tmp_path / "fixed.hwpx"
+    report = fix_char_borders(bad, out)
+    assert report["created"] is False               # 기존 무테두리 fill 재사용
+    assert report["fixed"] >= 1
+    assert report["borderfill_id"] == "1"            # 원래 있던 무테두리 fill의 id
+
+    after = check_package(out)
+    assert after["signals"]["char_border_bug"] is False
+    assert after["ok"], after["errors"]
+
+
 def test_repair_noop_on_clean_document(tmp_path):
     clean = build_minimal_hwpx(tmp_path / "clean.hwpx")
     out = tmp_path / "same.hwpx"

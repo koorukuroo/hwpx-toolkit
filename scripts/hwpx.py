@@ -517,7 +517,8 @@ def build_parser():
     g = sub.add_parser("guard", help="레퍼런스 대비 가드")
     g.add_argument("output")
     g.add_argument("--reference", required=True)
-    g.add_argument("--rules", help='{"require":[],"forbid":[],"forbid_regex":[]}')
+    g.add_argument("--rules", help='{"require":[],"forbid":[],"forbid_regex":[],'
+                                    '"require_regex":[],"placeholder_regex":[]}')
     g.add_argument("--max-growth", type=float, default=None)
     g.add_argument("--max-unchanged-ratio", type=float, default=None,
                    help="원문 그대로인 긴 줄 비율 상한 (전면 재작성 검사)")

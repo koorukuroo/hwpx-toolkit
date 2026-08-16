@@ -164,9 +164,14 @@ def check_package(path):
 
         from core.capacity import cell_report      # 순환 import 회피
         over = [c for c in cell_report(path)["cells"] if c["over"]]
+        multi_section = len(section_names(pkg.names())) > 1
         for c in over[:20]:
+            loc = f"표 {c['table']} ({c['row']},{c['col']})"
+            if multi_section:
+                sec_m = re.fullmatch(r"Contents/section(\d+)\.xml", c["section"])
+                loc = f"sec{sec_m.group(1)} {loc}" if sec_m else f"{c['section']} {loc}"
             warnings.append(
-                f"cell-overflow-risk: 표 {c['table']} ({c['row']},{c['col']}) "
+                f"cell-overflow-risk: {loc} "
                 f"추정 수용 {c['capacity']}em < 실제 {c['used']}em "
                 f"(문자 {c['used_chars']}자)")
         if len(over) > 20:
@@ -218,6 +223,7 @@ def guard_against_reference(output, reference, *, rules=None, max_growth=None,
             errors.append(f"entry-added: {name}")
 
     text = extract_text(output)
+    ref_text = extract_text(reference)
     rules = rules or {}
     for kw in rules.get("require", []):
         if kw not in text:
@@ -236,11 +242,19 @@ def guard_against_reference(output, reference, *, rules=None, max_growth=None,
     if not no_default_placeholders:
         patterns = _DEFAULT_PLACEHOLDERS + patterns
     for pat in patterns:
+        out_count = len(re.findall(pat, text))
+        if out_count == 0:
+            continue
+        ref_count = len(re.findall(pat, ref_text))
         m = re.search(pat, text)
-        if m:
-            errors.append(f"placeholder-found: {pat} → {m.group(0)[:30]}")
+        match_str = m.group(0)[:30] if m else ""
+        if out_count > ref_count:
+            errors.append(f"placeholder-found: {pat} → {match_str}")
+        else:
+            warnings.append(
+                f"placeholder-inherited: {pat} → {match_str} (레퍼런스에도 있음)")
 
-    ref_len = len(re.sub(r"\s", "", extract_text(reference)))
+    ref_len = len(re.sub(r"\s", "", ref_text))
     out_len = len(re.sub(r"\s", "", text))
     growth = (out_len / ref_len) if ref_len else 1.0
     if max_growth is not None:
@@ -252,7 +266,7 @@ def guard_against_reference(output, reference, *, rules=None, max_growth=None,
 
     unchanged_ratio = None
     if max_unchanged_ratio is not None:
-        ref_lines = _long_lines(extract_text(reference))
+        ref_lines = _long_lines(ref_text)
         out_lines = list(_long_lines(text))
         if out_lines:
             same = sum(1 for ln in out_lines if ln in ref_lines)

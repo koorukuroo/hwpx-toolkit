@@ -31,7 +31,7 @@ _DATE_PADDED = re.compile(r"\b(\d{4})\.\s*(0\d|\d{1,2})\.\s*(0\d|\d{1,2})\.")
 _YEAR_2DIGIT = re.compile(r"(?<![\d:.])(\d{2})\.\s*(\d{1,2})\.\s*(\d{1,2})\.")
 _AMOUNT_ABBREV = re.compile(r"[\d,]+\s*(천원|백만원|억원|만원)")
 _ATTACH_COLON = re.compile(r"붙임\s*:")
-_RANGE_REDUNDANT = re.compile(r"[~∼][^,;，；]{0,20}까지")
+_RANGE_REDUNDANT = re.compile(r"[~∼][^,;，；]{0,12}까지")
 _FOREIGN_ORDER = re.compile(r"(?<![\w/])([A-Z]{2,})\(([가-힣]{2,})\)")
 
 

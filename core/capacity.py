@@ -22,6 +22,8 @@ def estimate_chars(cell_w, cell_h, margins, font_hwp, line_spacing_pct):
         return 0
     usable_w = int(cell_w) - int(margins.get("left", 0)) - int(margins.get("right", 0))
     usable_h = int(cell_h) - int(margins.get("top", 0)) - int(margins.get("bottom", 0))
+    if usable_w <= 0 or usable_h <= 0:
+        return 0
     glyph_w = int(font_hwp)
     line_h = max(1, int(round(font_hwp * (line_spacing_pct or 100) / 100)))
     per_line = max(1, usable_w // glyph_w)

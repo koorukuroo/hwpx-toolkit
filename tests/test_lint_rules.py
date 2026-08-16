@@ -46,6 +46,13 @@ def test_range_redundant_not_mere_cooccurrence():
     assert "range-redundant" not in _rules("8. 1.~8. 16. 접수")
 
 
+def test_range_redundant_not_mere_cooccurrence_no_comma():
+    # 쉼표가 없어도 물결표와 '까지' 사이에 문장이 이어지면(창을 넘는 거리)
+    # 오탐이 되어서는 안 된다.
+    assert "range-redundant" not in _rules(
+        "지원등급은 A~C 등급으로 나뉘며 신청은 3월 말까지 받는다.")
+
+
 def test_foreign_order():
     assert "foreign-order" in _rules("AI(인공지능) 기반 서비스")
     assert _find("AI(인공지능) 기반", "foreign-order")["suggest"] == "인공지능(AI)"

@@ -125,9 +125,11 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
 14. lint는 게이트가 아니다. findings를 요약해 사용자에게 보여주고 수정 여부는
     사용자가 정한다(공문 표기 규칙은 references/gonmun-rules.md).
 15. check가 `char-border-bug`를 보고하면 `fix-borders`로 수리한 뒤 다시 check한다.
-    수리는 header.xml만 바꾸므로 본문은 그대로다.
+    수리는 header.xml만 바꾸므로 본문은 그대로다. fix-borders는 header.xml을
+    바꾸므로, 원본과 대조하는 `guard --reference`는 `entry-changed:
+    Contents/header.xml`을 보고한다(서식 커맨드와 동일한 정상 동작).
 16. check의 `cell-overflow-risk` 경고는 추정이라 ok를 막지 않는다. 양식을 채울 때는
-    `fill --analyze`가 알려주는 각 타겟의 `capacity`(셀의 em 단위 수용량)를 보고,
+    `fill --analyze`가 알려주는 label-cell 타겟의 `capacity`(셀의 em 단위 수용량)를 보고,
     채울 값의 길이를 ASCII 0.5em·한글 1em으로 환산해 비교한다(경고는 환산값과 실제 문자 수를 함께 표시).
     넘칠 수밖에 없으면 사용자에게 알린다.
 17. 문서 전체를 새 관점으로 재작성하는 작업(기관 교체 등)은 guard에

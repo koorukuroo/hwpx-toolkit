@@ -1,9 +1,14 @@
 import json
+import zipfile
 import pytest
 from core.package import HwpxPackage
 from core.guards import check_package, guard_against_reference
 from core.edit import edit_file
-from tests.fixture import build_form_hwpx, build_minimal_hwpx
+from tests.fixture import (
+    build_form_hwpx, build_minimal_hwpx,
+    MIMETYPE, VERSION_XML, SETTINGS_XML, CONTAINER_XML, MANIFEST_XML,
+    HEADER_XML, SECTION_HEAD, _table,
+)
 
 
 def test_check_passes_clean_document(tmp_path):
@@ -81,6 +86,56 @@ def test_guard_growth(tmp_path):
     assert any(e.startswith("growth-exceeded") for e in r["errors"])
     r2 = guard_against_reference(out, ref)
     assert any(w.startswith("growth-warning") for w in r2["warnings"])
+
+
+def _build_two_section_hwpx(path):
+    """섹션마다 표0 (0,1)에 넘치는 셀을 하나씩 둔 2섹션 문서.
+    표 인덱스는 섹션마다 0부터 다시 세므로, 접두어 없이는 두 경고 문자열이
+    똑같아진다 — check_package가 다중 섹션에서 sec 접두어를 붙이는지 확인."""
+    overflow_table = _table(rows=[["라벨", "가" * 60]])
+    section_xml = SECTION_HEAD + overflow_table + "</hs:sec>"
+
+    content_hpf = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<opf:package xmlns:opf="http://www.idpf.org/2007/opf/" version="" '
+        'unique-identifier="" id="">'
+        '<opf:metadata><opf:title>fixture</opf:title></opf:metadata>'
+        '<opf:manifest>'
+        '<opf:item id="header" href="Contents/header.xml" media-type="application/xml"/>'
+        '<opf:item id="section0" href="Contents/section0.xml" media-type="application/xml"/>'
+        '<opf:item id="section1" href="Contents/section1.xml" media-type="application/xml"/>'
+        '</opf:manifest>'
+        '<opf:spine><opf:itemref idref="header"/><opf:itemref idref="section0"/>'
+        '<opf:itemref idref="section1"/></opf:spine>'
+        '</opf:package>'
+    )
+
+    entries = [
+        ("mimetype", MIMETYPE),
+        ("version.xml", VERSION_XML),
+        ("settings.xml", SETTINGS_XML),
+        ("META-INF/container.xml", CONTAINER_XML),
+        ("META-INF/manifest.xml", MANIFEST_XML),
+        ("Contents/content.hpf", content_hpf),
+        ("Contents/header.xml", HEADER_XML),
+        ("Contents/section0.xml", section_xml),
+        ("Contents/section1.xml", section_xml),
+    ]
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, text in entries:
+            ctype = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
+            zf.writestr(zipfile.ZipInfo(name), text.encode("utf-8"),
+                        compress_type=ctype)
+    return path
+
+
+def test_cell_overflow_warning_disambiguates_multi_section(tmp_path):
+    p = _build_two_section_hwpx(tmp_path / "two_sec.hwpx")
+    r = check_package(p)
+    overflow_msgs = [w for w in r["warnings"] if w.startswith("cell-overflow-risk")]
+    assert len(overflow_msgs) == 2
+    assert overflow_msgs[0] != overflow_msgs[1]
+    assert "sec0" in overflow_msgs[0] and "sec1" in overflow_msgs[1]
 
 
 def test_cli_check_and_guard(tmp_path, capsys):

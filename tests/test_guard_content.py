@@ -63,6 +63,35 @@ def test_unchanged_ratio_absent_when_not_requested(tmp_path):
     assert r["unchanged_ratio"] is None
 
 
+def test_placeholder_inherited_from_reference_is_warning_not_error(tmp_path):
+    # 레퍼런스에도 있는 익명화 표기(홍○○)는 그대로 옮겨졌을 뿐 새로 만든 게
+    # 아니므로 오류가 아니라 경고여야 한다.
+    ref = _doc(tmp_path, "ref.hwpx", ["담당자 홍○○ (○○부 소속)"])
+    out = _doc(tmp_path, "out.hwpx", ["담당자 홍○○ (○○부 소속) 확인함"])
+    r = guard_against_reference(out, ref)
+    assert r["ok"] is True, r["errors"]
+    assert not [e for e in r["errors"] if e.startswith("placeholder-found")]
+    assert any(w.startswith("placeholder-inherited") for w in r["warnings"])
+
+
+def test_placeholder_still_errors_when_reference_is_clean(tmp_path):
+    # 레퍼런스에 없던 placeholder를 출력이 새로 만들면 여전히 오류.
+    ref = _doc(tmp_path, "ref.hwpx", ["기관명 자리"])
+    out = _doc(tmp_path, "out.hwpx", ["담당 {{name}}"])
+    r = guard_against_reference(out, ref)
+    assert any(e.startswith("placeholder-found") for e in r["errors"])
+    assert r["ok"] is False
+
+
+def test_placeholder_errors_when_output_has_more_than_reference(tmp_path):
+    # 레퍼런스에 ○○가 1건 있어도, 출력이 2건으로 늘리면 오류.
+    ref = _doc(tmp_path, "ref.hwpx", ["담당자 홍○○"])
+    out = _doc(tmp_path, "out.hwpx", ["담당자 홍○○ 및 부담당자 김○○"])
+    r = guard_against_reference(out, ref)
+    assert any(e.startswith("placeholder-found") for e in r["errors"])
+    assert r["ok"] is False
+
+
 def test_cli_guard_new_flags(tmp_path, capsys):
     import sys
     from pathlib import Path as P
