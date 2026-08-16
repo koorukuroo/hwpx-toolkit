@@ -31,8 +31,33 @@ _DATE_PADDED = re.compile(r"\b(\d{4})\.\s*(0\d|\d{1,2})\.\s*(0\d|\d{1,2})\.")
 _YEAR_2DIGIT = re.compile(r"(?<![\d:.])(\d{2})\.\s*(\d{1,2})\.\s*(\d{1,2})\.")
 _AMOUNT_ABBREV = re.compile(r"[\d,]+\s*(천원|백만원|억원|만원)")
 _ATTACH_COLON = re.compile(r"붙임\s*:")
-_RANGE_REDUNDANT = re.compile(r"[~∼][^,;，；]{0,12}까지")
+_RANGE_TILDE = re.compile(r"[~∼]")
+_RANGE_STOP = re.compile(r"[,;，；]")
+_RANGE_HANGUL = re.compile(r"[가-힣]")
+_RANGE_WINDOW = 20
+_RANGE_MAX_HANGUL = 2
 _FOREIGN_ORDER = re.compile(r"(?<![\w/])([A-Z]{2,})\(([가-힣]{2,})\)")
+
+
+def _range_redundant(line):
+    """물결표(~/∼) 뒤 20자 이내에 '까지'가 나오는지 찾되, 단순 동시 출현과
+    진짜 중복 표기를 '사이 구간의 내용 모양'으로 구분한다. 사이에 쉼표류가
+    있으면(문장이 그 사이에서 갈라진 것) 애초에 후보에서 제외하고, 남은
+    구간은 한글 음절 수를 센다 — 날짜/시간 표기(`2023.5.2.(화) 18:00`,
+    `2026. 8. 16.`)는 한글이 0~1음절뿐이지만, 문장이 이어지는 경우
+    (`C 등급으로 나뉘며 신청은 3월 말`)는 한글이 여러 음절이라 걸러진다."""
+    for m in _RANGE_TILDE.finditer(line):
+        window = line[m.end():m.end() + _RANGE_WINDOW]
+        stop_m = _RANGE_STOP.search(window)
+        if stop_m:
+            window = window[:stop_m.start()]
+        idx = window.find("까지")
+        if idx == -1:
+            continue
+        span = window[:idx]
+        if len(_RANGE_HANGUL.findall(span)) <= _RANGE_MAX_HANGUL:
+            return True
+    return False
 
 
 def _add(findings, rule, lineno, text, message, suggest=None):
@@ -81,7 +106,7 @@ def lint_text(text):
         if _ATTACH_COLON.search(line):
             _add(findings, "attach-colon", i, line,
                  "'붙임' 뒤에는 쌍점 없이 두 칸 띄운다", "붙임  ")
-        if _RANGE_REDUNDANT.search(line):
+        if _range_redundant(line):
             _add(findings, "range-redundant", i, line,
                  "물결표 범위와 '까지'는 함께 쓰지 않는다")
         line_no_url = _URL.sub("URL", line)

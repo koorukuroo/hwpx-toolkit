@@ -47,10 +47,18 @@ def test_range_redundant_not_mere_cooccurrence():
 
 
 def test_range_redundant_not_mere_cooccurrence_no_comma():
-    # 쉼표가 없어도 물결표와 '까지' 사이에 문장이 이어지면(창을 넘는 거리)
-    # 오탐이 되어서는 안 된다.
+    # 쉼표가 없어도 물결표와 '까지' 사이에 문장(한글 음절이 여러 개인 프로즈)이
+    # 이어지면 오탐이 되어서는 안 된다 — 거리(창 길이)가 아니라 사이 구간의
+    # 한글 밀도로 판단한다.
     assert "range-redundant" not in _rules(
         "지원등급은 A~C 등급으로 나뉘며 신청은 3월 말까지 받는다.")
+
+
+def test_range_redundant_real_document_date_time_range():
+    # 실물 문서에서 검증된 진짜 중복 표기: 물결표와 '까지' 사이가
+    # 날짜/시간(한글 음절 1개 이하)이면 창이 20자에 가깝게 넓어도 잡아야 한다.
+    assert "range-redundant" in _rules(
+        "□ 접수기간 : 2023.4.17.(월)~2023.5.2.(화) 18:00까지")
 
 
 def test_foreign_order():
