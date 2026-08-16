@@ -23,10 +23,83 @@ def test_set_page_landscape_a3_margins(tmp_path):
         orientation="landscape", size="a3",
         margins_mm={"left": 16, "right": 16, "top": 20, "bottom": 20}))
     pp = _first_run(_sec_root(dst)).find(f".//{{{NS_HP}}}pagePr")
-    assert pp.get("landscape") == "NARROWLY"
+    # hp:pagePr@landscape는 건드리지 않는다 — 회전은 폭/높이 스왑만으로 표현한다
+    # (실제 방향은 landscape 속성과 폭>높이 여부의 XOR, 한컴 실물 검증 2026-08-17).
+    assert pp.get("landscape") == "WIDELY"
     assert (pp.get("width"), pp.get("height")) == ("119055", "84186")
     m = pp.find(f"{{{NS_HP}}}margin")
     assert m.get("left") == "4536" and m.get("top") == "5670"
+    assert check_package(dst)["ok"]
+
+
+def _narrowly_variant(tmp_path):
+    """landscape="WIDELY" -> "NARROWLY"로 바꾼, 이미 가로로 렌더링되는 문서
+    (표의 NARROWLY/portrait-dims 행)."""
+    src = build_form_hwpx(tmp_path / "f.hwpx")
+    pkg = HwpxPackage.open(src)
+    sec = pkg.read_text("Contents/section0.xml").replace(
+        'landscape="WIDELY"', 'landscape="NARROWLY"')
+    variant = tmp_path / "narrowly.hwpx"
+    pkg.write_replaced(variant, {"Contents/section0.xml": sec.encode("utf-8")})
+    return variant
+
+
+def test_set_page_landscape_from_portrait_swaps_dims_keeps_attr(tmp_path):
+    # 기준 픽스처: landscape="WIDELY", 59528x84186 (portrait dims) => 세로로 렌더링.
+    src = build_form_hwpx(tmp_path / "f.hwpx")
+    dst = tmp_path / "o.hwpx"
+    edit_file(src, dst, lambda ed: ed.set_page(orientation="landscape"))
+    pp = _first_run(_sec_root(dst)).find(f".//{{{NS_HP}}}pagePr")
+    assert pp.get("landscape") == "WIDELY"
+    assert (pp.get("width"), pp.get("height")) == ("84186", "59528")
+    assert check_package(dst)["ok"]
+
+
+def test_set_page_landscape_is_idempotent(tmp_path):
+    # 두 번 연속 landscape를 적용해도 다시 세로로 뒤집히면 안 된다
+    # (이번 버그: 회전을 이중 적용).
+    src = build_form_hwpx(tmp_path / "f.hwpx")
+    d1 = tmp_path / "1.hwpx"
+    edit_file(src, d1, lambda ed: ed.set_page(orientation="landscape"))
+    d2 = tmp_path / "2.hwpx"
+    edit_file(d1, d2, lambda ed: ed.set_page(orientation="landscape"))
+    pp = _first_run(_sec_root(d2)).find(f".//{{{NS_HP}}}pagePr")
+    assert pp.get("landscape") == "WIDELY"
+    assert (pp.get("width"), pp.get("height")) == ("84186", "59528")
+    assert check_package(d2)["ok"]
+
+
+def test_set_page_landscape_noop_when_already_landscape(tmp_path):
+    # landscape="NARROWLY" + portrait dims는 표 상 이미 가로 렌더링 상태이므로
+    # set_page(orientation="landscape")는 아무것도 바꾸지 않아야 한다.
+    variant = _narrowly_variant(tmp_path)
+    dst = tmp_path / "o.hwpx"
+    edit_file(variant, dst, lambda ed: ed.set_page(orientation="landscape"))
+    pp = _first_run(_sec_root(dst)).find(f".//{{{NS_HP}}}pagePr")
+    assert pp.get("landscape") == "NARROWLY"
+    assert (pp.get("width"), pp.get("height")) == ("59528", "84186")
+    assert check_package(dst)["ok"]
+
+
+def test_set_page_portrait_on_narrowly_swaps_dims_keeps_attr(tmp_path):
+    # 같은 NARROWLY 문서에 portrait을 요청하면 스왑된 치수
+    # (84186x59528, attr는 그대로)가 실제로 세로로 렌더링되는 조합이다.
+    variant = _narrowly_variant(tmp_path)
+    dst = tmp_path / "o.hwpx"
+    edit_file(variant, dst, lambda ed: ed.set_page(orientation="portrait"))
+    pp = _first_run(_sec_root(dst)).find(f".//{{{NS_HP}}}pagePr")
+    assert pp.get("landscape") == "NARROWLY"
+    assert (pp.get("width"), pp.get("height")) == ("84186", "59528")
+    assert check_package(dst)["ok"]
+
+
+def test_set_page_portrait_on_plain_portrait_is_noop(tmp_path):
+    src = build_form_hwpx(tmp_path / "f.hwpx")
+    dst = tmp_path / "o.hwpx"
+    edit_file(src, dst, lambda ed: ed.set_page(orientation="portrait"))
+    pp = _first_run(_sec_root(dst)).find(f".//{{{NS_HP}}}pagePr")
+    assert pp.get("landscape") == "WIDELY"
+    assert (pp.get("width"), pp.get("height")) == ("59528", "84186")
     assert check_package(dst)["ok"]
 
 

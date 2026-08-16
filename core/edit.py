@@ -416,19 +416,16 @@ class SectionEditor:
             pagepr.set("width", str(w))
             pagepr.set("height", str(h))
         if orientation is not None:
-            w, h = int(pagepr.get("width")), int(pagepr.get("height"))
-            if orientation == "landscape":
-                pagepr.set("landscape", "NARROWLY")
-                if w < h:
-                    pagepr.set("width", str(h))
-                    pagepr.set("height", str(w))
-            elif orientation == "portrait":
-                pagepr.set("landscape", "WIDELY")
-                if w > h:
-                    pagepr.set("width", str(h))
-                    pagepr.set("height", str(w))
-            else:
+            if orientation not in ("portrait", "landscape"):
                 raise EditError(f"orientation 값 오류: {orientation}")
+            w, h = int(pagepr.get("width")), int(pagepr.get("height"))
+            # hp:pagePr@landscape는 90° 회전 플래그이고 폭>높이도 회전이라,
+            # 실제 방향은 둘의 XOR이다 (한컴 실물 검증, 2026-08-17).
+            rotated = pagepr.get("landscape") == "NARROWLY"
+            is_landscape = (w > h) != rotated
+            if is_landscape != (orientation == "landscape"):
+                pagepr.set("width", str(h))
+                pagepr.set("height", str(w))
         if margins_mm:
             m = pagepr.find(_q("margin"))
             if m is None:
