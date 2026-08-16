@@ -30,7 +30,8 @@ def hwp_to_hwpx(src, dst, *, timeout=120):
     try:
         proc = subprocess.run(
             [node, str(WRAPPER), str(src), str(dst)],
-            capture_output=True, text=True, timeout=timeout)
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=timeout)
     except subprocess.TimeoutExpired:
         raise PackageError(f"변환 시간 초과({timeout}s): {src.name}")
     if proc.returncode != 0 or not dst.is_file():

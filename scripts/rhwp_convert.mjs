@@ -3,7 +3,7 @@
 // 사용: node scripts/rhwp_convert.mjs <input.hwp> <output.hwpx>
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const [input, output] = process.argv.slice(2);
@@ -14,7 +14,7 @@ if (!input || !output) {
 
 try {
   const vendorDir = path.join(here, "..", "vendor", "rhwp");
-  const mod = await import(path.join(vendorDir, "rhwp.js"));
+  const mod = await import(pathToFileURL(path.join(vendorDir, "rhwp.js")).href);
   const wasm = fs.readFileSync(path.join(vendorDir, "rhwp_bg.wasm"));
   await mod.default({ module_or_path: wasm });
   const bytes = new Uint8Array(fs.readFileSync(input));

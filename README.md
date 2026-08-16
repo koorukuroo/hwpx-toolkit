@@ -2,7 +2,7 @@
 
 한글(Hancom Office) HWPX 문서를 생성·읽기·편집·검증하는 MIT 라이선스 Claude 스킬.
 
-- 순수 Python stdlib 코어 (pip install 불필요)
+- 순수 Python stdlib 코어 (pip install 불필요, from-hwp만 Node.js 18+ 필요)
 - 원본 바이트 보존 편집 (변경 엔트리 외 바이트 동일)
 - 전달 전 필수 검증 게이트
 

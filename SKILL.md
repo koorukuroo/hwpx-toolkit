@@ -7,7 +7,7 @@ allowed-tools: Bash(python3 *), Read, Write, Glob, Grep
 # hwpx-toolkit
 
 HWPX는 한컴오피스 한글의 개방형 문서 포맷(OWPML, KS X 6101)이다.
-ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 동작한다 (pip 불필요).
+ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 동작한다 (pip 불필요, from-hwp만 Node.js 18+ 필요).
 
 ## 워크플로우 선택
 
@@ -108,6 +108,8 @@ ZIP 패키지 + XML 파트 구조. 모든 커맨드는 순수 Python stdlib로 �
 10. 서식 커맨드(set-text-style/set-para-style)는 대상 문단(--after 문구 | --para N)
     만 바꾼다. header.xml에 새 스타일이 추가되고 다른 문단은 영향 없다.
     스타일을 안 건드린 편집은 header.xml이 바이트 동일하게 유지된다.
+    report 템플릿의 `##` 제목은 1×1 표(섹션 바)로 렌더되므로 set-text-style --after
+    등 본문 문단 대상 커맨드의 기준 문구로 쓸 수 없다(셀 텍스트).
 11. 이미지는 PNG/JPEG만. insert-image에서 크기 미지정 시 96dpi 환산 (resize-image는
     한쪽 이상 지정 필요), 한쪽만 주면 비율 유지. replace-image는 기존 BinData를
     남기고 새 항목을 추가한다.

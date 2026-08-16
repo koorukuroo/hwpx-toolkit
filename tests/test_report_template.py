@@ -62,3 +62,12 @@ def test_report_table_uses_style_map(tmp_path):
     assert check_package(out)["ok"]
     doc = analyze_document(out)
     assert doc["sections"][0]["tables"] == [{"index": 0, "rows": 2, "cols": 2}]
+
+    # 커스텀 style_map이 실제로 렌더 결과에 반영되는지 배선 확인
+    alloc = owpml.IdAllocator()
+    custom_xml = owpml.table(
+        [["a", "b"], ["1", "2"]], alloc,
+        style_map={"table": {"header_char": "6", "header_border": "5",
+                              "body_border": "3", "cell_para": "5"}})
+    assert 'borderFillIDRef="5"' in custom_xml
+    assert 'charPrIDRef="6"' in custom_xml
