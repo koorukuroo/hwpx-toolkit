@@ -161,6 +161,15 @@ def check_package(path):
                     signals["image_ref_broken"] = True
                     errors.append(
                         f"image-ref-broken: {ref} (manifest/BinData 불일치)")
+
+        from core.capacity import cell_report      # 순환 import 회피
+        over = [c for c in cell_report(path)["cells"] if c["over"]]
+        for c in over[:20]:
+            warnings.append(
+                f"cell-overflow-risk: 표 {c['table']} ({c['row']},{c['col']}) "
+                f"추정 수용 {c['capacity']}자 < 실제 {c['used']}자")
+        if len(over) > 20:
+            warnings.append(f"cell-overflow-risk: 외 {len(over) - 20}건 더")
     except (PackageError, ET.ParseError):
         pass  # 구조 오류는 validate가 이미 errors에 보고
     return {"ok": not errors, "errors": errors, "warnings": warnings,

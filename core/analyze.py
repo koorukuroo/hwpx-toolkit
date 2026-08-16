@@ -149,6 +149,9 @@ def _scan_checkbox_paren(text, targets, section):
 
 
 def fill_targets(path):
+    from core.capacity import cell_report          # 순환 import 회피
+    caps = {(c["section"], c["table"], c["row"], c["col"]): c["capacity"]
+            for c in cell_report(path)["cells"]}
     pkg = HwpxPackage.open(path)
     targets = []
     for name, root in _sections(pkg):
@@ -177,7 +180,8 @@ def fill_targets(path):
                                 "key": _norm_label(cell_text),
                                 "kind": "label-cell", "label": cell_text,
                                 "table": table_index, "row": r, "col": c + 1,
-                                "section": name})
+                                "section": name,
+                                "capacity": caps.get((name, table_index, r, c + 1), 0)})
                         # 셀 내부 문단도 checkbox/paren 스캔 대상에 포함
                         _scan_checkbox_paren(cell_text, targets, name)
                     table_index += 1
