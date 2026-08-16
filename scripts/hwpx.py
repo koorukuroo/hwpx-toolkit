@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import analyze, guards  # noqa: E402
+from core import convert as convert_mod  # noqa: E402
 from core import edit as edit_mod  # noqa: E402
 from core import fill as fill_mod  # noqa: E402
 from core import markdown as md_mod  # noqa: E402
@@ -261,6 +262,12 @@ def cmd_check(args):
     return 0 if result["ok"] else 2
 
 
+def cmd_from_hwp(args):
+    result = convert_mod.hwp_to_hwpx(args.input, args.output)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["ok"] else 2
+
+
 def cmd_guard(args):
     rules = json.loads(_read_text_utf8(args.rules)) if args.rules else None
     result = guards.guard_against_reference(
@@ -472,6 +479,11 @@ def build_parser():
     ck = sub.add_parser("check", help="전달 전 필수 게이트 (validate + 사고 패턴)")
     ck.add_argument("file")
     ck.set_defaults(func=cmd_check)
+
+    fh = sub.add_parser("from-hwp", help="HWP(5.x) → HWPX 변환 (Node.js 18+ 필요)")
+    fh.add_argument("input")
+    fh.add_argument("-o", "--output", required=True)
+    fh.set_defaults(func=cmd_from_hwp)
 
     g = sub.add_parser("guard", help="레퍼런스 대비 가드")
     g.add_argument("output")
