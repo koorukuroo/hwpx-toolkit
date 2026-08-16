@@ -28,10 +28,10 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
     python3 scripts/hwpx.py set-header 샘플.hwpx h.hwpx --text "대외비" --align center
     python3 scripts/hwpx.py set-pagenum h.hwpx hp.hwpx --where footer
 
-- [ ] h.hwpx: 머리말 "대외비"가 각 쪽 상단 가운데에 보이는가
-- [ ] hp.hwpx: 꼬리말에 쪽번호가 보이는가
-- [ ] set-page --orientation landscape 산출물이 가로로 열리는가
-- [ ] set-text-style --bold --color C00000 산출물의 대상 문단만 붉은 굵은 글씨인가
+- [x] h.hwpx: 머리말 "대외비"가 각 쪽 상단 가운데에 보이는가  (2026-08-17 확인)
+- [x] hp.hwpx: 꼬리말에 쪽번호가 보이는가  (2026-08-17 확인)
+- [ ] set-page --orientation landscape 산출물이 가로로 열리는가  (2026-08-17 실패 → 회전 이중 적용 수정, 재확인 대기)
+- [x] set-text-style --bold --color C00000 산출물의 대상 문단만 붉은 굵은 글씨인가  (2026-08-17 확인)
 
 실패 시: 한컴에서 머리말을 넣고 저장한 .hwpx를 unpack해 `hp:header` 구조를
 비교하고 `SectionEditor.set_header_footer`를 보정한다.
@@ -96,5 +96,5 @@ base 템플릿은 OWPML 스펙 기반 클린룸 작성물이다. 구조 검증(v
 
 ## Phase 5 추가 검증 항목
 
-- [ ] `new --template report` 산출물: 제목 16pt 굵게, `##` 절 제목이 진남색 바 위 흰 글자로 보이는가
-- [ ] `from-hwp` 산출물이 원본 .hwp와 동일한 내용/서식으로 열리는가 (rhwp 품질)
+- [x] `new --template report` 산출물: 제목 16pt 굵게, `##` 절 제목이 진남색 바 위 흰 글자로 보이는가  (2026-08-17 확인)
+- [x] `from-hwp` 산출물이 원본 .hwp와 동일한 내용/서식으로 열리는가 (rhwp 품질)  (2026-08-17 확인)
