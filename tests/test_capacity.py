@@ -60,7 +60,14 @@ def test_overflow_detected_and_reported_as_warning(tmp_path):
 
     r = check_package(dst)
     assert r["ok"] is True                       # 경고이지 오류가 아님
-    assert any(w.startswith("cell-overflow-risk") for w in r["warnings"])
+    overflow_msgs = [w for w in r["warnings"] if w.startswith("cell-overflow-risk")]
+    assert overflow_msgs
+    # used가 em 단위 실수이므로 "자"를 그대로 붙이면 "25.5자" 같은 말이 안 되는
+    # 표현이 된다 — 단위를 정직하게 "em"으로 쓰고, 사람이 읽는 실제 글자 수는
+    # 별도로 "문자 N자"로 덧붙여야 한다.
+    msg = next(m for m in overflow_msgs if m.startswith("cell-overflow-risk: 표"))
+    assert "em <" in msg and "em (" in msg
+    assert "문자 60자" in msg
 
 
 def test_no_false_overflow_on_clean_fixtures(tmp_path):

@@ -162,7 +162,11 @@ def fill_targets(path):
             if tbls:
                 for tbl in tbls:
                     grid = {}
-                    for tc in tbl.iter(_q("tc")):
+                    # 최상위 표의 직계 셀만(tr→tc) — 중첩 표의 셀은 제외한다
+                    # (core.capacity._direct_cells, core.edit._tables와 동일 컨벤션).
+                    direct_tcs = [tc for tr in tbl.findall(_q("tr"))
+                                  for tc in tr.findall(_q("tc"))]
+                    for tc in direct_tcs:
                         addr = tc.find(_q("cellAddr"))
                         r = int(addr.get("rowAddr"))
                         c = int(addr.get("colAddr"))

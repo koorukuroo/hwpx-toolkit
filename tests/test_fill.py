@@ -231,6 +231,125 @@ def test_fill_targets_and_edit_agree_on_table_index_with_nested_table(tmp_path):
     assert "중첩" in out_section0
 
 
+def test_fill_targets_ignores_nested_table_cells(tmp_path):
+    """fill_targets의 grid 구성이 tbl.iter(tc)로 표를 순회하면, 중첩 표의
+    셀이 바깥 셀과 같은 (rowAddr,colAddr) 주소를 갖고 있어 바깥 셀의 텍스트를
+    덮어써 버릴 수 있다 (core.capacity._direct_cells에서 이미 고친 것과
+    동일한 버그). 최상위 표의 직계 셀(tr→tc)만 봐야 한다."""
+    second_table = _table(rows=[["둘째표", ""]])
+    section0 = SECTION_HEAD + _NESTED_OUTER_TABLE + second_table + "</hs:sec>"
+    path = _pack_section0(tmp_path / "nested2.hwpx", section0)
+
+    targets = fill_targets(path)["targets"]
+    # 중첩 표의 텍스트("중첩")가 라벨/체크박스/괄호 타겟 어디에도 나타나면 안 됨
+    assert not any(t.get("label") == "중첩" for t in targets)
+    assert not any("중첩" in t.get("literal", "") for t in targets)
+    # 표 인덱스는 최상위 표(0, 1)만 가리켜야 함 — 중첩 표는 별도 인덱스를
+    # 받지 않고, 중첩 셀이 클로버링을 일으켜도 표 번호 자체는 새지 않는다
+    assert {t["table"] for t in targets if "table" in t} <= {0, 1}
+    label_targets = [t for t in targets if t["kind"] == "label-cell"]
+    assert len(label_targets) == 1 and label_targets[0]["key"] == "둘째표"
+
+
+# 2열짜리 최상위 표: col0="라벨"(0,0), col1=""(0,1)이며 col1 셀 안에 중첩
+# 1x1 표가 있고, 그 중첩 셀의 주소가 일부러 col0과 같은 (0,0)으로 충돌한다.
+# tbl.iter(tc)로 순회하면 문서 순서상 col0→col1→(col1 내부의 중첩 tc) 순으로
+# 방문되므로, 마지막에 방문되는 중첩 tc가 grid[(0,0)]을 "중첩"으로 덮어써
+# 진짜 라벨 "라벨"을 지워버린다 — 최상위 셀만 보면 이 충돌이 아예 없다.
+_COLLIDING_NESTED_TABLE = (
+    '<hp:p id="9100000100" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+    'columnBreak="0" merged="0"><hp:run charPrIDRef="0">'
+    '<hp:tbl id="9100000101" zOrder="0" numberingType="TABLE" '
+    'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
+    'dropcapstyle="None" pageBreak="CELL" repeatHeader="0" '
+    'rowCnt="1" colCnt="2" cellSpacing="0" borderFillIDRef="1" noAdjust="0">'
+    '<hp:sz width="42520" widthRelTo="ABSOLUTE" height="2400" '
+    'heightRelTo="ABSOLUTE" protect="0"/>'
+    '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" '
+    'allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" '
+    'horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" '
+    'vertOffset="0" horzOffset="0"/>'
+    '<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
+    '<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
+    '<hp:tr>'
+    # col0: 진짜 라벨 셀, 주소 (0,0)
+    '<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" '
+    'dirty="0" borderFillIDRef="1">'
+    '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" '
+    'vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" '
+    'textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+    '<hp:p id="9100000102" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+    'columnBreak="0" merged="0">'
+    '<hp:run charPrIDRef="0"><hp:t>라벨</hp:t></hp:run></hp:p>'
+    '</hp:subList>'
+    '<hp:cellAddr colAddr="0" rowAddr="0"/>'
+    '<hp:cellSpan colSpan="1" rowSpan="1"/>'
+    '<hp:cellSz width="21260" height="2400"/>'
+    '<hp:cellMargin left="141" right="141" top="141" bottom="141"/>'
+    '</hp:tc>'
+    # col1: 값 셀(직접 텍스트는 빈칸), 안에 중첩 표가 있고 그 중첩 셀 주소가
+    # col0과 똑같이 (0,0)으로 충돌한다.
+    '<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" '
+    'dirty="0" borderFillIDRef="1">'
+    '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" '
+    'vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" '
+    'textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+    '<hp:p id="9100000103" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+    'columnBreak="0" merged="0"><hp:run charPrIDRef="0">'
+    '<hp:tbl id="9100000104" zOrder="0" numberingType="TABLE" '
+    'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
+    'dropcapstyle="None" pageBreak="CELL" repeatHeader="0" '
+    'rowCnt="1" colCnt="1" cellSpacing="0" borderFillIDRef="1" noAdjust="0">'
+    '<hp:sz width="10000" widthRelTo="ABSOLUTE" height="1200" '
+    'heightRelTo="ABSOLUTE" protect="0"/>'
+    '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" '
+    'allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" '
+    'horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" '
+    'vertOffset="0" horzOffset="0"/>'
+    '<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
+    '<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
+    '<hp:tr>'
+    '<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" '
+    'dirty="0" borderFillIDRef="1">'
+    '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" '
+    'vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" '
+    'textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+    '<hp:p id="9100000105" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
+    'columnBreak="0" merged="0"><hp:run charPrIDRef="0">'
+    '<hp:t>중첩</hp:t></hp:run></hp:p>'
+    '</hp:subList>'
+    '<hp:cellAddr colAddr="0" rowAddr="0"/>'
+    '<hp:cellSpan colSpan="1" rowSpan="1"/>'
+    '<hp:cellSz width="10000" height="1200"/>'
+    '<hp:cellMargin left="0" right="0" top="0" bottom="0"/>'
+    '</hp:tc></hp:tr></hp:tbl>'
+    '</hp:run></hp:p>'
+    '</hp:subList>'
+    '<hp:cellAddr colAddr="1" rowAddr="0"/>'
+    '<hp:cellSpan colSpan="1" rowSpan="1"/>'
+    '<hp:cellSz width="21260" height="2400"/>'
+    '<hp:cellMargin left="141" right="141" top="141" bottom="141"/>'
+    '</hp:tc>'
+    '</hp:tr></hp:tbl></hp:run></hp:p>'
+)
+
+
+def test_fill_targets_grid_not_clobbered_by_colliding_nested_address(tmp_path):
+    """중첩 표의 셀 주소가 바깥 형제 셀의 주소와 우연히 같으면(둘 다 (0,0)),
+    tbl.iter(tc) 순회는 grid[(0,0)]을 나중에 방문되는 중첩 셀 텍스트("중첩")로
+    덮어써 진짜 라벨("라벨")을 잃어버린다. 최상위 셀(tr→tc)만 보면 이런
+    충돌 자체가 일어나지 않아야 한다."""
+    section0 = SECTION_HEAD + _COLLIDING_NESTED_TABLE + "</hs:sec>"
+    path = _pack_section0(tmp_path / "colliding_nested.hwpx", section0)
+
+    targets = fill_targets(path)["targets"]
+    label_targets = [t for t in targets if t["kind"] == "label-cell"]
+    assert len(label_targets) == 1
+    assert label_targets[0]["label"] == "라벨"
+    assert label_targets[0]["key"] == "라벨"
+    assert not any(t.get("label") == "중첩" for t in targets)
+
+
 def test_fill_multi_section_target_reported_unmatched(tmp_path):
     """멀티섹션 문서: section1 전용 타겟에 값을 채우려 하면 예외 없이
     unmatched로 보고되고 section0은 그대로 남아야 한다 (멀티섹션 편집은

@@ -167,7 +167,8 @@ def check_package(path):
         for c in over[:20]:
             warnings.append(
                 f"cell-overflow-risk: 표 {c['table']} ({c['row']},{c['col']}) "
-                f"추정 수용 {c['capacity']}자 < 실제 {c['used']}자")
+                f"추정 수용 {c['capacity']}em < 실제 {c['used']}em "
+                f"(문자 {c['used_chars']}자)")
         if len(over) > 20:
             warnings.append(f"cell-overflow-risk: 외 {len(over) - 20}건 더")
     except (PackageError, ET.ParseError):
