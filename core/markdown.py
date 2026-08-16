@@ -124,5 +124,5 @@ def render_to_section(md_text, template="base"):
             for item in block["items"]:
                 parts.append(owpml.text_para(item, alloc, para_pr=style["bullet_para"]))
         elif block["type"] == "table":
-            parts.append(owpml.table(block["rows"], alloc))
+            parts.append(owpml.table(block["rows"], alloc, style_map=style))
     return owpml.sec_document(first, parts, sec_open)

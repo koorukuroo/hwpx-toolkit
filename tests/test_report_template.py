@@ -52,3 +52,13 @@ def test_base_rendering_unchanged(tmp_path):
     xml = render_to_section(md, template="base")
     assert 'charPrIDRef="1"' in xml and 'paraPrIDRef="2"' in xml
     assert "<hp:tbl" not in xml
+
+
+def test_report_table_uses_style_map(tmp_path):
+    md = "| a | b |\n| --- | --- |\n| 1 | 2 |\n"
+    xml = render_to_section(md, template="report")
+    out = build_from_template(tmp_path / "t.hwpx", template="report", section_xml=xml,
+                              title="표")
+    assert check_package(out)["ok"]
+    doc = analyze_document(out)
+    assert doc["sections"][0]["tables"] == [{"index": 0, "rows": 2, "cols": 2}]

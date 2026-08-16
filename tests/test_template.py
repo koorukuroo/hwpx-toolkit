@@ -60,6 +60,14 @@ def test_stray_dotfiles_excluded_from_package(tmp_path, monkeypatch):
     assert r["ok"], r["errors"]
 
 
+def test_styles_json_excluded_from_package(tmp_path):
+    for tname in ("base", "report"):
+        out = build_from_template(tmp_path / f"{tname}.hwpx", template=tname)
+        with zipfile.ZipFile(out) as zf:
+            names = zf.namelist()
+        assert "styles.json" not in names
+
+
 def test_missing_content_hpf_raises_package_error(tmp_path, monkeypatch):
     templates_root = tmp_path / "templates_no_hpf"
     shutil.copytree(template_mod.TEMPLATES_DIR / "base", templates_root / "base")

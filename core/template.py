@@ -9,6 +9,10 @@ TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 _ENTRY_ORDER = ["mimetype", "version.xml", "settings.xml"]
 
+# 템플릿 디렉터리에는 있지만 OWPML 패키지 내용이 아닌 툴킷 메타 파일 —
+# manifest.xml에 선언되지 않으므로 조립 시 zip에서 제외한다.
+TEMPLATE_META_FILES = {"styles.json"}
+
 
 def _ordered_names(names):
     def key(name):
@@ -31,7 +35,10 @@ def build_from_template(dst, *, template="base", section_xml=None, title=None):
         rel = f.relative_to(tdir)
         if any(part.startswith(".") for part in rel.parts):
             continue  # .DS_Store 등 숨김/메타 파일은 패키지에서 제외
-        files[str(rel).replace("\\", "/")] = f.read_bytes()
+        rel_str = str(rel).replace("\\", "/")
+        if rel_str in TEMPLATE_META_FILES:
+            continue  # styles.json 등 툴킷 전용 메타 파일은 패키지에서 제외
+        files[rel_str] = f.read_bytes()
     if section_xml is not None:
         files["Contents/section0.xml"] = section_xml.encode("utf-8")
     if title is not None:

@@ -73,16 +73,17 @@ def bullet_para(text, alloc, marker="•"):
     return _para(alloc.next(), f"{marker} {xml_escape(text)}", "0", "4", False)
 
 
-def _cell(row, col, text, width, height, alloc, *, header_cell):
-    border = "4" if header_cell else "3"
-    char_pr = "4" if header_cell else "0"
+def _cell(row, col, text, width, height, alloc, *, header_cell,
+          header_char="4", header_border="4", body_border="3", cell_para="5"):
+    border = header_border if header_cell else body_border
+    char_pr = header_char if header_cell else "0"
     return (
         '<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" '
         f'dirty="0" borderFillIDRef="{border}">'
         '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" '
         'vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" '
         'textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
-        f'<hp:p id="{alloc.next()}" paraPrIDRef="5" styleIDRef="0" '
+        f'<hp:p id="{alloc.next()}" paraPrIDRef="{cell_para}" styleIDRef="0" '
         'pageBreak="0" columnBreak="0" merged="0">'
         f'<hp:run charPrIDRef="{char_pr}">'
         + (f"<hp:t>{xml_escape(text)}</hp:t>" if text else "<hp:t/>")
@@ -115,12 +116,18 @@ def section_bar(text, alloc, style_map, total_width=42520, height=1200):
         f'<hp:tr>{cell}</hp:tr></hp:tbl></hp:run></hp:p>')
 
 
-def table(rows, alloc, *, header=True, total_width=42520, row_height=2400):
+def table(rows, alloc, *, header=True, total_width=42520, row_height=2400,
+          style_map=None):
     if not rows:
         raise ValueError("빈 표는 만들 수 없음")
     cols = len(rows[0])
     if cols == 0 or any(len(r) != cols for r in rows):
         raise ValueError("모든 행의 열 수가 같아야 함")
+    t = style_map["table"] if style_map else {}
+    header_char = t.get("header_char", "4")
+    header_border = t.get("header_border", "4")
+    body_border = t.get("body_border", "3")
+    cell_para = t.get("cell_para", "5")
     base = total_width // cols
     widths = [base] * cols
     widths[-1] += total_width - base * cols
@@ -129,7 +136,9 @@ def table(rows, alloc, *, header=True, total_width=42520, row_height=2400):
         is_header = header and r == 0
         cells = "".join(
             _cell(r, c, row[c], widths[c], row_height, alloc,
-                  header_cell=is_header)
+                  header_cell=is_header, header_char=header_char,
+                  header_border=header_border, body_border=body_border,
+                  cell_para=cell_para)
             for c in range(cols))
         tr_parts.append(f"<hp:tr>{cells}</hp:tr>")
     tbl_id = alloc.next()
@@ -142,7 +151,7 @@ def table(rows, alloc, *, header=True, total_width=42520, row_height=2400):
         'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
         'dropcapstyle="None" pageBreak="CELL" repeatHeader="1" '
         f'rowCnt="{len(rows)}" colCnt="{cols}" cellSpacing="0" '
-        'borderFillIDRef="3" noAdjust="0">'
+        f'borderFillIDRef="{body_border}" noAdjust="0">'
         f'<hp:sz width="{total_width}" widthRelTo="ABSOLUTE" '
         f'height="{height}" heightRelTo="ABSOLUTE" protect="0"/>'
         '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" '
