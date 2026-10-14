@@ -23,5 +23,14 @@
     "header_border": "4",
     "body_border": "3",
     "cell_para": "5"
-  }
+  },
+  "bold_char": "5",
+  "code_char": "6",
+  "bullet_levels": [
+    "4",
+    "6",
+    "7"
+  ],
+  "quote_para": "8",
+  "code_para": "9"
 }

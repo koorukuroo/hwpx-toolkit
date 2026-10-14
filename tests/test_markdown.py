@@ -28,7 +28,7 @@ def test_parse_blocks():
     assert types == ["heading", "paragraph", "heading", "bullet",
                      "ordered", "table"]
     assert blocks[0] == {"type": "heading", "level": 1, "text": "사업 계획"}
-    assert blocks[1]["text"] == "개요 문단입니다. 강조와 코드 포함."
+    assert blocks[1]["text"] == "개요 문단입니다. **강조**와 `코드` 포함."   # 인라인 마커는 렌더 시 run으로
     assert blocks[3]["items"] == ["첫 목표", "둘째 목표"]
     assert blocks[4]["items"] == ["1. 단계 하나", "2. 단계 둘"]
     assert blocks[5]["rows"] == [["항목", "예산"], ["인건비", "100"],

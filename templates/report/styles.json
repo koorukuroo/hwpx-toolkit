@@ -27,5 +27,14 @@
   "section_bar": {
     "char": "6",
     "border": "5"
-  }
+  },
+  "bold_char": "7",
+  "code_char": "8",
+  "bullet_levels": [
+    "4",
+    "7",
+    "8"
+  ],
+  "quote_para": "9",
+  "code_para": "10"
 }

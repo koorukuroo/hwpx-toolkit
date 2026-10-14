@@ -2,6 +2,7 @@
 """hwpx-toolkit 단일 CLI. 사용: python3 scripts/hwpx.py <command> ..."""
 import argparse
 import json
+import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -73,9 +74,11 @@ def cmd_new(args):
         raise PackageError(f"입력 파일 없음: {src}")
     text = _read_text_utf8(src)
     title = args.title or md_mod.first_heading(text) or src.stem
-    section = md_mod.render_to_section(text, template=args.template)
+    section, assets, manifest = md_mod.render_document(
+        text, template=args.template, base_dir=src.parent)
     build_from_template(args.output, template=args.template,
-                        section_xml=section, title=title)
+                        section_xml=section, title=title,
+                        extra_files=assets, manifest_items=manifest)
     return _finish_generated(args.output)
 
 
@@ -86,64 +89,95 @@ def cmd_build(args):
     return _finish_generated(args.output)
 
 
-def _finish_edited(dst, report):
-    gate = guards.check_package(dst)
-    ok = gate["ok"] and not report.get("not_found")
-    payload = {"ok": ok, "output": str(dst), "report": report, "gate": gate}
+def _tmp_for(dst):
+    """산출물을 먼저 임시 파일에 만들고 check 통과 후에만 dst 이름을 준다."""
+    dst = Path(dst)
+    return dst.with_name(f".{dst.name}.{os.getpid()}.pending")
+
+
+def _edit(args, fn):
+    tmp = _tmp_for(args.dst)
+    args._tmp = tmp
+    return edit_mod.edit_file(args.src, tmp, fn)
+
+
+def _finish_edited(args, report):
+    """check 게이트. 통과 → dst로 승격. 실패 → <dst 이름>.rejected.hwpx 로 남기고
+    dst는 만들지 않는다(깨진 파일이 요청한 이름으로 전달되는 것을 막는다)."""
+    dst = Path(args.dst)
+    tmp = getattr(args, "_tmp", None)
+    gate = guards.check_package(tmp if tmp is not None else dst)
+    payload = {"ok": gate["ok"] and not report.get("not_found"),
+               "output": str(dst), "report": report, "gate": gate}
+    if tmp is not None:
+        if gate["ok"]:
+            os.replace(tmp, dst)
+        else:
+            rejected = dst.with_name(dst.stem + ".rejected" + dst.suffix)
+            os.replace(tmp, rejected)
+            payload["output"] = None
+            payload["rejected_output"] = str(rejected)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 0 if ok else 2
+    return 0 if payload["ok"] else 2
 
 
 def cmd_replace(args):
     mapping = json.loads(_read_text_utf8(args.map))
-    report = edit_mod.edit_file(args.src, args.dst,
+    report = _edit(args,
                                 lambda ed: ed.replace_text(mapping))
-    return _finish_edited(args.dst, report)
+    return _finish_edited(args, report)
 
 
 def cmd_set_cell(args):
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.set_cell_text(args.table, args.row,
                                                    args.col, args.text))
-    return _finish_edited(args.dst,
+    return _finish_edited(args,
                           {"set_cell": [args.table, args.row, args.col]})
+
+
+def cmd_set_cell_style(args):
+    n = _edit(args, lambda ed: ed.set_cell_style(
+        args.table, args.row, args.col, bg=args.bg, border=args.border,
+        width=args.width, row2=args.row2, col2=args.col2))
+    return _finish_edited(args, {"styled_cells": n, "bg": args.bg, "border": args.border})
 
 
 def cmd_add_row(args):
     cells = json.loads(_read_text_utf8(args.cells))
-    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.add_row(args.table, cells))
-    return _finish_edited(args.dst, {"added_row": cells})
+    _edit(args, lambda ed: ed.add_row(args.table, cells))
+    return _finish_edited(args, {"added_row": cells})
 
 
 def cmd_del_row(args):
-    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.del_row(args.table, args.row))
-    return _finish_edited(args.dst, {"deleted_row": args.row})
+    _edit(args, lambda ed: ed.del_row(args.table, args.row))
+    return _finish_edited(args, {"deleted_row": args.row})
 
 
 def cmd_merge_cells(args):
-    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.merge_cells(
+    _edit(args, lambda ed: ed.merge_cells(
         args.table, args.row, args.col, args.row2, args.col2))
-    return _finish_edited(args.dst, {"merged": [args.row, args.col, args.row2, args.col2]})
+    return _finish_edited(args, {"merged": [args.row, args.col, args.row2, args.col2]})
 
 
 def cmd_add_col(args):
     cells = json.loads(_read_text_utf8(args.cells))
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.add_col(args.table, cells, at=args.at))
-    return _finish_edited(args.dst, {"added_col": cells})
+    return _finish_edited(args, {"added_col": cells})
 
 
 def cmd_add_para(args):
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.add_para_after(args.after, args.text))
-    return _finish_edited(args.dst, {"added_after": args.after})
+    return _finish_edited(args, {"added_after": args.after})
 
 
 def cmd_insert_image(args):
-    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.insert_image(
+    _edit(args, lambda ed: ed.insert_image(
         args.image, after=args.after, index=args.para,
         width_mm=args.width_mm, height_mm=args.height_mm))
-    return _finish_edited(args.dst, {"inserted": args.image})
+    return _finish_edited(args, {"inserted": args.image})
 
 
 def cmd_list_images(args):
@@ -154,20 +188,20 @@ def cmd_list_images(args):
 
 
 def cmd_resize_image(args):
-    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.resize_image(
+    _edit(args, lambda ed: ed.resize_image(
         args.index, width_mm=args.width_mm, height_mm=args.height_mm))
-    return _finish_edited(args.dst, {"resized": args.index})
+    return _finish_edited(args, {"resized": args.index})
 
 
 def cmd_replace_image(args):
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.replace_image(args.index, args.image))
-    return _finish_edited(args.dst, {"replaced": args.index})
+    return _finish_edited(args, {"replaced": args.index})
 
 
 def cmd_delete_image(args):
-    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.delete_image(args.index))
-    return _finish_edited(args.dst, {"deleted": args.index})
+    _edit(args, lambda ed: ed.delete_image(args.index))
+    return _finish_edited(args, {"deleted": args.index})
 
 
 def cmd_fill(args):
@@ -181,12 +215,11 @@ def cmd_fill(args):
     cells = json.loads(_read_text_utf8(args.cells)) if args.cells else None
     if not values and not cells:
         raise PackageError("--values 또는 --cells 중 하나는 필요합니다")
-    report = fill_mod.fill_file(args.src, args.dst, values=values, cells=cells)
-    gate = guards.check_package(args.dst)
-    ok = gate["ok"] and not report["unmatched"]
-    print(json.dumps({"ok": ok, "output": args.dst, "report": report,
-                      "gate": gate}, ensure_ascii=False, indent=2))
-    return 0 if ok else 2
+    args._tmp = _tmp_for(args.dst)
+    report = fill_mod.fill_file(args.src, args._tmp, values=values, cells=cells)
+    if report["unmatched"]:
+        report["not_found"] = report["unmatched"]
+    return _finish_edited(args, report)
 
 
 def _target_kwargs(args):
@@ -197,17 +230,17 @@ def cmd_set_text_style(args):
     kw = dict(bold=True if args.bold else None, italic=True if args.italic else None,
               underline=True if args.underline else None,
               color=args.color, size_pt=args.size)
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.set_text_style(**_target_kwargs(args), **kw))
-    return _finish_edited(args.dst, {"set_text_style": kw})
+    return _finish_edited(args, {"set_text_style": kw})
 
 
 def cmd_set_para_style(args):
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.set_para_style(**_target_kwargs(args),
                                                     align=args.align,
                                                     line_spacing=args.line_spacing))
-    return _finish_edited(args.dst, {"set_para_style": {"align": args.align,
+    return _finish_edited(args, {"set_para_style": {"align": args.align,
                                                         "line_spacing": args.line_spacing}})
 
 
@@ -215,52 +248,53 @@ def cmd_set_page(args):
     margins = None
     if args.margin_mm is not None:
         margins = {k: args.margin_mm for k in ("left", "right", "top", "bottom")}
-    edit_mod.edit_file(args.src, args.dst, lambda ed: ed.set_page(
+    _edit(args, lambda ed: ed.set_page(
         orientation=args.orientation, size=args.size, margins_mm=margins))
-    return _finish_edited(args.dst, {"set_page": {
+    return _finish_edited(args, {"set_page": {
         "orientation": args.orientation, "size": args.size,
         "margin_mm": args.margin_mm}})
 
 
 def cmd_set_columns(args):
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.set_columns(args.count, gap_mm=args.gap_mm))
-    return _finish_edited(args.dst, {"columns": args.count})
+    return _finish_edited(args, {"columns": args.count})
 
 
 def cmd_page_break(args):
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.set_page_break(args.after, on=not args.off))
-    return _finish_edited(args.dst, {"page_break": args.after, "on": not args.off})
+    return _finish_edited(args, {"page_break": args.after, "on": not args.off})
 
 
 def _cmd_hf(kind):
     def run(args):
-        edit_mod.edit_file(args.src, args.dst,
+        _edit(args,
                            lambda ed: ed.set_header_footer(kind, args.text,
                                                            align=args.align))
-        return _finish_edited(args.dst, {kind: args.text})
+        return _finish_edited(args, {kind: args.text})
     return run
 
 
 def _cmd_remove_hf(kind):
     def run(args):
-        edit_mod.edit_file(args.src, args.dst,
+        _edit(args,
                            lambda ed: ed.remove_header_footer(kind))
-        return _finish_edited(args.dst, {"removed": kind})
+        return _finish_edited(args, {"removed": kind})
     return run
 
 
 def cmd_set_pagenum(args):
-    edit_mod.edit_file(args.src, args.dst,
+    _edit(args,
                        lambda ed: ed.set_page_number(where=args.where,
                                                      align=args.align))
-    return _finish_edited(args.dst, {"pagenum": args.where})
+    return _finish_edited(args, {"pagenum": args.where})
 
 
 def cmd_fix_borders(args):
-    report = repair_mod.fix_char_borders(args.src, args.dst)
-    return _finish_edited(args.dst, report)
+    args._tmp = _tmp_for(args.dst)
+    report = repair_mod.fix_char_borders(args.src, args._tmp)
+    return _finish_edited(args, report)
 
 
 def cmd_check(args):
@@ -270,7 +304,7 @@ def cmd_check(args):
 
 
 def cmd_from_hwp(args):
-    result = convert_mod.hwp_to_hwpx(args.input, args.output)
+    result = convert_mod.hwp_to_hwpx(args.input, args.output, engine=args.engine)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["ok"] else 2
 
@@ -279,7 +313,7 @@ def cmd_lint(args):
     # findings는 게이트가 아니므로 findings 유무는 exit code에 영향을 주지 않는다(항상 0).
     # 파일을 못 찾거나 hwpx가 손상된 경우 등은 예외로 올라가 main()의 표준
     # JSON+exit 2 오류 계약을 그대로 따른다 (다른 명령과 동일).
-    result = lint_mod.lint_file(args.file)
+    result = lint_mod.lint_file(args.file, doc_type=args.doc_type)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
@@ -289,7 +323,8 @@ def cmd_guard(args):
     result = guards.guard_against_reference(
         args.output, args.reference, rules=rules, max_growth=args.max_growth,
         max_unchanged_ratio=args.max_unchanged_ratio,
-        no_default_placeholders=args.no_default_placeholders)
+        no_default_placeholders=args.no_default_placeholders,
+        strict_structure=args.strict_structure)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["ok"] else 2
 
@@ -351,6 +386,19 @@ def build_parser():
     sc.add_argument("--col", type=int, required=True)
     sc.add_argument("--text", required=True)
     sc.set_defaults(func=cmd_set_cell)
+
+    cs = sub.add_parser("set-cell-style", help="셀 배경색/테두리 (사각 범위 가능)")
+    cs.add_argument("src")
+    cs.add_argument("dst")
+    cs.add_argument("--table", type=int, required=True)
+    cs.add_argument("--row", type=int, required=True)
+    cs.add_argument("--col", type=int, required=True)
+    cs.add_argument("--row2", type=int)
+    cs.add_argument("--col2", type=int)
+    cs.add_argument("--bg", help="RRGGBB 또는 none")
+    cs.add_argument("--border", choices=["solid", "none", "dash", "double", "dot"])
+    cs.add_argument("--width", help='테두리 굵기, 예: "0.12 mm"')
+    cs.set_defaults(func=cmd_set_cell_style)
 
     ar = sub.add_parser("add-row", help="표 행 추가 (마지막 행 복제)")
     ar.add_argument("src")
@@ -503,15 +551,20 @@ def build_parser():
     ck.add_argument("file")
     ck.set_defaults(func=cmd_check)
 
-    fh = sub.add_parser("from-hwp", help="HWP(5.x) → HWPX 변환 (Node.js 18+ 필요)")
+    fh = sub.add_parser("from-hwp", help="HWP(5.x) → HWPX 변환 (기본 python 엔진, 의존성 없음)")
     fh.add_argument("input")
     fh.add_argument("-o", "--output", required=True)
+    fh.add_argument("--engine", choices=list(convert_mod.ENGINES), default="auto",
+                    help="auto: python 엔진, 읽기 실패 시 rhwp(Node.js) 폴백 / python / rhwp")
     fh.set_defaults(func=cmd_from_hwp)
 
     ln = sub.add_parser(
         "lint", help="공문서 작성법 검수 (hwpx 또는 텍스트; findings는 게이트 아님, "
                      "파일 오류만 exit 2)")
     ln.add_argument("file")
+    ln.add_argument("--doc-type", choices=["gonmun", "bogo"],
+                    help="gonmun: 공문 필수 요소(수신·발신명의·시행·공개) 검사 추가 / "
+                         "bogo: 개조식 보고서 문체 검사 추가")
     ln.set_defaults(func=cmd_lint)
 
     g = sub.add_parser("guard", help="레퍼런스 대비 가드")
@@ -524,6 +577,8 @@ def build_parser():
                    help="원문 그대로인 긴 줄 비율 상한 (전면 재작성 검사)")
     g.add_argument("--no-default-placeholders", action="store_true",
                    help="기본 placeholder 패턴 검사 끄기")
+    g.add_argument("--strict-structure", action="store_true",
+                   help="문단 수·표 모양·쪽나눔 수가 레퍼런스와 다르면 경고가 아니라 오류")
     g.set_defaults(func=cmd_guard)
 
     return p

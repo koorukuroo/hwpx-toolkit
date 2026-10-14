@@ -15,15 +15,22 @@
 | charPr | 3 | 12pt(1200) 돋움 볼드 — H3 이하 |
 | charPr | 4 | 10pt(1000) 돋움 볼드 — 표 헤더 |
 | charPr | 5 | 16pt(1600) 돋움 볼드 — report 템플릿 H1 제목 |
-| charPr | 6 | 12pt(1200) 돋움 볼드 흰색(#FFFFFF) — 섹션 바 글자 |
+| charPr | 6 | 12pt(1200) 돋움 볼드 흰색(#FFFFFF) — 섹션 바 글자 (report) |
+| charPr | 5 (base) / 7 (report) | 10pt 바탕 볼드 — 마크다운 `**굵게**` (styles.json `bold_char`) |
+| charPr | 6 (base) / 8 (report) | 9pt 돋움 — `` `코드` ``·코드 블록 (`code_char`) |
 | paraPr | 0 | JUSTIFY 160% 본문 |
 | paraPr | 1 | CENTER 160%, prev/next 800 — 제목(H1) |
 | paraPr | 2 | LEFT 160%, prev 600 next 200 — H2 |
 | paraPr | 3 | LEFT 160%, prev 400 next 100 — H3 이하 |
 | paraPr | 4 | JUSTIFY 160%, left 600 — 목록 |
 | paraPr | 5 | CENTER 130% — 표 셀 |
-| paraPr | 6 | LEFT 160%, prev 600 next 200 — 섹션 바용 |
-| style | 0 | PARA "바탕글" (paraPr 0 + charPr 0) |
+| paraPr | 6 | LEFT 160%, prev 600 next 200 — 섹션 바용 (report) |
+| paraPr | 6,7 (base) / 7,8 (report) | left 1200 / 1800 — 목록 2·3단계 (`bullet_levels`) |
+| paraPr | 8 (base) / 9 (report) | left·right 800, 150% — 인용 (`quote_para`) |
+| paraPr | 9 (base) / 10 (report) | LEFT 130%, left 400 — 코드 블록 (`code_para`) |
+| style | 0–22 | PARA 한컴 표준 23종: 바탕글, 본문, 개요 1~10, 쪽 번호, 줄 번호, 머리말, 각주, 미주, 메모, 차례 제목, 차례 1~3, 캡션 (모두 paraPr 0 + charPr 0) |
+
+템플릿별 실제 ID는 `templates/<이름>/styles.json`을 읽는다 (`core.owpml.load_style_map`).
 
 - 템플릿 수정은 `scripts/dev/gen_templates.py`를 고쳐 재실행한다.
   산출물(templates/base/*)을 직접 편집하지 않는다.

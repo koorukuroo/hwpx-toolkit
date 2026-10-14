@@ -113,5 +113,43 @@ class HeaderEditor:
         self.dirty = True
         return new.get("id")
 
+    _EDGES = ("leftBorder", "rightBorder", "topBorder", "bottomBorder")
+
+    def clone_border_fill(self, base_id, *, bg=None, border=None, width=None):
+        """borderFill 복제 — bg: 배경색 RRGGBB|none, border: solid|none|dash|double,
+        width: '0.12 mm' 등. 셀 배경·테두리 지정용."""
+        coll, items = self._collection("borderFills", "borderFill")
+        new = copy.deepcopy(self._find(items, base_id))
+        new.set("id", self._next_id(items))
+        if border is not None:
+            kind = {"solid": "SOLID", "none": "NONE", "dash": "DASH",
+                    "double": "DOUBLE_SLIM", "dot": "DOT"}.get(border.lower())
+            if kind is None:
+                raise EditError(f"테두리 종류 오류: {border}")
+            for edge in self._EDGES:
+                e = new.find(_h(edge))
+                if e is None:
+                    e = ET.SubElement(new, _h(edge), {"width": "0.12 mm", "color": "#000000"})
+                e.set("type", kind)
+                if width is not None:
+                    e.set("width", width)
+        if bg is not None:
+            fill = new.find(f"{{{NS_HC}}}fillBrush")
+            if bg.lower() == "none":
+                if fill is not None:
+                    new.remove(fill)
+            else:
+                if fill is None:
+                    fill = ET.SubElement(new, f"{{{NS_HC}}}fillBrush")
+                wb = fill.find(f"{{{NS_HC}}}winBrush")
+                if wb is None:
+                    wb = ET.SubElement(fill, f"{{{NS_HC}}}winBrush",
+                                       {"hatchColor": "#999999", "alpha": "0"})
+                wb.set("faceColor", "#" + bg.lstrip("#").upper())
+        coll.append(new)
+        coll.set("itemCnt", str(len(coll.findall(_h("borderFill")))))
+        self.dirty = True
+        return new.get("id")
+
     def serialize(self):
         return (_XML_DECL + ET.tostring(self.root, encoding="unicode")).encode("utf-8")

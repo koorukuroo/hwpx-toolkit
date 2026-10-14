@@ -46,6 +46,28 @@ def border_fill(bid, edge_type="NONE", width="0.1 mm", fill=None):
             f'{fill_xml}</hh:borderFill>')
 
 
+#: 한컴 표준 스타일 23종 (한컴오피스 새 문서의 스타일 목록과 같은 이름·순서).
+#: 모두 paraPr 0 / charPr 0 을 가리킨다 — 목록이 비어 보이지 않게 하고, 사용자가
+#: 한컴에서 스타일을 골라 쓸 수 있게 하는 것이 목적이다.
+STANDARD_STYLES = [
+    ("바탕글", "Normal"), ("본문", "Body"),
+    *[(f"개요 {i}", f"Outline {i}") for i in range(1, 11)],
+    ("쪽 번호", "Page Number"), ("줄 번호", "Line Number"), ("머리말", "Header"),
+    ("각주", "Footnote"), ("미주", "Endnote"), ("메모", "Memo"),
+    ("차례 제목", "TOC Heading"), ("차례 1", "TOC 1"), ("차례 2", "TOC 2"),
+    ("차례 3", "TOC 3"), ("캡션", "Caption"),
+]
+
+
+def styles_xml():
+    items = []
+    for i, (name, eng) in enumerate(STANDARD_STYLES):
+        items.append(f'<hh:style id="{i}" type="PARA" name="{name}" engName="{eng}" '
+                     f'paraPrIDRef="0" charPrIDRef="0" nextStyleIDRef="{i}" langID="1042" '
+                     'lockForm="0"/>')
+    return f'<hh:styles itemCnt="{len(items)}">' + "".join(items) + "</hh:styles>"
+
+
 def char_pr(cid, height, font=0, bold=False, color="000000"):
     bold_xml = "<hh:bold/>" if bold else ""
     return (f'<hh:charPr id="{cid}" height="{height}" textColor="#{color}" '
@@ -64,12 +86,12 @@ def char_pr(cid, height, font=0, bold=False, color="000000"):
             '</hh:charPr>')
 
 
-def para_pr(pid, align="JUSTIFY", spacing=160, prev=0, nxt=0, left=0):
+def para_pr(pid, align="JUSTIFY", spacing=160, prev=0, nxt=0, left=0, right=0):
     margin = (
         '<hh:margin>'
         '<hc:intent value="0" unit="HWPUNIT"/>'
         f'<hc:left value="{left}" unit="HWPUNIT"/>'
-        '<hc:right value="0" unit="HWPUNIT"/>'
+        f'<hc:right value="{right}" unit="HWPUNIT"/>'
         f'<hc:prev value="{prev}" unit="HWPUNIT"/>'
         f'<hc:next value="{nxt}" unit="HWPUNIT"/>'
         '</hh:margin>'
@@ -92,6 +114,20 @@ def para_pr(pid, align="JUSTIFY", spacing=160, prev=0, nxt=0, left=0):
             '</hh:paraPr>')
 
 
+def common_char_prs(start):
+    """마크다운 인라인 서식용 charPr — start부터 (본문 굵게, 코드)."""
+    return [char_pr(start, 1000, bold=True),          # **굵게** (본문 글꼴)
+            char_pr(start + 1, 900, font=1)]          # `코드`/코드 블록 (돋움 9pt)
+
+
+def common_para_prs(start):
+    """마크다운 블록용 paraPr — start부터 (목록 2단계, 3단계, 인용, 코드 블록)."""
+    return [para_pr(start, left=1200),                # 목록 2단계
+            para_pr(start + 1, left=1800),            # 목록 3단계
+            para_pr(start + 2, left=800, right=800, spacing=150),   # 인용
+            para_pr(start + 3, align="LEFT", spacing=130, left=400)]  # 코드 블록
+
+
 def header_xml(extra_border_fills=(), extra_char_prs=(), extra_para_prs=()):
     border_fills = [
         border_fill(1),
@@ -108,6 +144,7 @@ def header_xml(extra_border_fills=(), extra_char_prs=(), extra_para_prs=()):
         char_pr(4, 1000, font=1, bold=True),
         *extra_char_prs,
     ]
+    char_prs += common_char_prs(len(char_prs))
     para_prs = [
         para_pr(0),
         para_pr(1, align="CENTER", prev=800, nxt=800),
@@ -117,6 +154,7 @@ def header_xml(extra_border_fills=(), extra_char_prs=(), extra_para_prs=()):
         para_pr(5, align="CENTER", spacing=130),
         *extra_para_prs,
     ]
+    para_prs += common_para_prs(len(para_prs))
     parts = [
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
         '<hh:head xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" '
@@ -138,11 +176,7 @@ def header_xml(extra_border_fills=(), extra_char_prs=(), extra_para_prs=()):
         f'<hh:paraProperties itemCnt="{len(para_prs)}">',
         *para_prs,
         '</hh:paraProperties>',
-        '<hh:styles itemCnt="1">'
-        '<hh:style id="0" type="PARA" name="바탕글" engName="Normal" '
-        'paraPrIDRef="0" charPrIDRef="0" nextStyleIDRef="0" langID="1042" '
-        'lockForm="0"/>'
-        '</hh:styles>',
+        styles_xml(),
         '</hh:refList>',
         '</hh:head>',
     ]
@@ -262,11 +296,21 @@ CONTENT_HPF = (
     '</opf:package>')
 
 
+def _md_styles(char_start, para_start):
+    """공용 마크다운 서식 ID — header_xml의 common_char_prs/common_para_prs와 정렬."""
+    return {
+        "bold_char": str(char_start), "code_char": str(char_start + 1),
+        "bullet_levels": ["4", str(para_start), str(para_start + 1)],
+        "quote_para": str(para_start + 2), "code_para": str(para_start + 3),
+    }
+
+
 BASE_STYLES = {
     "heading": {"1": ["1", "1"], "2": ["2", "2"], "default": ["3", "3"]},
     "body": ["0", "0"], "bullet_para": "4",
     "table": {"header_char": "4", "header_border": "4", "body_border": "3",
               "cell_para": "5"},
+    **_md_styles(5, 6),
 }
 REPORT_STYLES = {
     "heading": {"1": ["5", "1"], "2": ["2", "6"], "default": ["3", "3"]},
@@ -274,6 +318,7 @@ REPORT_STYLES = {
     "table": {"header_char": "4", "header_border": "4", "body_border": "3",
               "cell_para": "5"},
     "section_bar": {"char": "6", "border": "5"},
+    **_md_styles(7, 7),
 }
 
 

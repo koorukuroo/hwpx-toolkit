@@ -27,7 +27,7 @@ def test_style_maps_exist_and_generator_idempotent():
 def test_report_header_has_extra_styles():
     root = ET.fromstring((TEMPLATES_DIR / "report/Contents/header.xml").read_bytes())
     chars = root.find(f".//{{{NS_HH}}}charProperties")
-    assert chars.get("itemCnt") == "7"
+    assert chars.get("itemCnt") == "9"      # 0-6 + 굵게(7) + 코드(8)
     c6 = root.find(f".//{{{NS_HH}}}charPr[@id='6']")
     assert c6.get("textColor") == "#FFFFFF"
     bf5 = root.find(f".//{{{NS_HH}}}borderFill[@id='5']")

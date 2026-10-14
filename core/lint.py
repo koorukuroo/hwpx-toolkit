@@ -37,6 +37,16 @@ _RANGE_HANGUL = re.compile(r"[가-힣]")
 _RANGE_WINDOW = 20
 _RANGE_MAX_HANGUL = 2
 _FOREIGN_ORDER = re.compile(r"(?<![\w/])([A-Z]{2,})\(([가-힣]{2,})\)")
+_DATE_NO_END_DOT = re.compile(r"(?<![\d.])(\d{4})\.\s(\d{1,2})\.\s(\d{1,2})(?![.\d])")
+_TIME_24H = re.compile(r"(?<![\d:])24:00(?![\d:])")
+_TIME_COLON_SP = re.compile(r"(?<!\d)(\d{1,2})(?:\s+:\s*|\s*:\s+)(\d{2})(?!\d)")
+_MONEY_GEUM_SP = re.compile(r"금\s+(\d{1,3}(?:,\d{3})+|\d+)원")
+_ATTACH_NUMBERED_ONE = re.compile(r"^\s*붙임\s+1\.\s")
+_SUSIN = re.compile(r"^\s*수신\s")
+_SIHAENG = re.compile(r"^\s*시행\s")
+_DISCLOSURE = re.compile(r"(부분공개|비공개|공개)")
+_BALSIN = re.compile(r"^\s*[가-힣·\s]{2,25}(장|관|감|이사장|총장|원장|대표)\s*$")
+_BOGO_SENTENCE = re.compile(r"(습니다|입니다|합니다|됩니다|있습니다)\.?\s*$")
 
 
 def _range_redundant(line):
@@ -69,13 +79,72 @@ def _time_suggest(m):
     ampm, hh, mm = m.group(1), int(m.group(2)), m.group(3)
     if ampm == "오후" and hh < 12:
         hh += 12
+    if hh == 24:
+        hh = 0          # 24시는 없다 — 자정은 00:00
     return f"{hh:02d}:{int(mm or 0):02d}"
 
 
-def lint_text(text):
+def _lone_sub_items(lines, findings):
+    """하위 항목이 하나뿐이면 항목 기호를 붙이지 않는다 (예: '가.'만 있고 '나.'가 없음)."""
+    parents = {}            # (level, parent_line) → [child line numbers]
+    last_at_level = {}
+    for i, l in enumerate(lines, 1):
+        for level, rx in _ITEM:
+            if rx.match(l):
+                if level > 0:
+                    parent = last_at_level.get(level - 1)
+                    parents.setdefault((level, parent), []).append(i)
+                last_at_level[level] = i
+                for deeper in [k for k in last_at_level if k > level]:
+                    del last_at_level[deeper]
+                break
+    for (level, parent), children in parents.items():
+        if parent is not None and len(children) == 1:
+            i = children[0]
+            _add(findings, "item-lone", i, lines[i - 1],
+                 "하위 항목이 하나뿐이면 항목 기호를 붙이지 않는다")
+
+
+def _gonmun_structure(lines, findings):
+    stripped = [l for l in lines if l.strip()]
+    if not any(_SUSIN.match(l) for l in stripped):
+        _add(findings, "gonmun-missing-susin", 1, stripped[0] if stripped else "",
+             "공문에는 '수신' 란이 있어야 한다 (예: 수신  수신자 참조)")
+    if not any(_SIHAENG.match(l) for l in stripped):
+        _add(findings, "gonmun-missing-sihaeng", len(lines), stripped[-1] if stripped else "",
+             "공문 결문에는 '시행 문서번호 (일자)' 가 있어야 한다")
+    if not any(_DISCLOSURE.search(l) for l in stripped[-8:]):
+        _add(findings, "gonmun-missing-disclosure", len(lines), stripped[-1] if stripped else "",
+             "공문 결문에는 공개 구분(공개/부분공개/비공개)이 있어야 한다")
+    if not any(_BALSIN.match(l) for l in stripped):
+        _add(findings, "gonmun-missing-balsin", len(lines), stripped[-1] if stripped else "",
+             "발신명의(기관장 직명, '…장'/'…관'/'…감')가 한 줄로 있어야 한다")
+
+
+def _bogo_style(lines, findings):
+    for i, l in enumerate(lines, 1):
+        if _BOGO_SENTENCE.search(l.strip()) and len(l.strip()) > 6:
+            _add(findings, "bogo-sentence-ending", i, l,
+                 "개조식 보고서는 서술형 종결어미(…합니다/…입니다) 대신 명사형으로 끝맺는다")
+
+
+def lint_text(text, doc_type=None):
     findings = []
     lines = text.splitlines()
     for i, line in enumerate(lines, 1):
+        for m in _DATE_NO_END_DOT.finditer(line):
+            y, mo, d = m.group(1), int(m.group(2)), int(m.group(3))
+            if 1 <= mo <= 12 and 1 <= d <= 31:
+                _add(findings, "date-end-dot", i, line, "연월일 뒤에는 온점을 찍는다",
+                     f"{y}. {mo}. {d}.")
+        for m in _TIME_24H.finditer(line):
+            _add(findings, "time-24h", i, line, "24:00 대신 00:00 (24시각제는 00:00~23:59)", "00:00")
+        for m in _TIME_COLON_SP.finditer(line):
+            _add(findings, "time-colon-space", i, line, "시:분 사이에 공백을 두지 않는다",
+                 f"{int(m.group(1)):02d}:{m.group(2)}")
+        for m in _MONEY_GEUM_SP.finditer(line):
+            _add(findings, "money-geum-space", i, line, "'금'과 숫자는 붙여 쓴다",
+                 f"금{m.group(1)}원")
         for rx, why in _DATE_BAD:
             for m in rx.finditer(line):
                 y, mo, d = m.group(1), int(m.group(2)), int(m.group(3))
@@ -124,6 +193,18 @@ def lint_text(text):
     nonempty = [(i, l) for i, l in enumerate(lines, 1) if l.strip()]
     if nonempty:
         in_attach = False
+        attach_items = 0
+        attach_first = None
+        for i, l in nonempty:
+            if _ATTACH_LINE.match(l):
+                in_attach = True
+                attach_first = (i, l)
+            if in_attach and re.sub(r"\s*끝\.\s*$", "", _ATTACH_LINE.sub("", l)).strip():
+                attach_items += 1
+        if attach_items == 1 and attach_first and _ATTACH_NUMBERED_ONE.match(attach_first[1]):
+            _add(findings, "attachment-single-numbered", attach_first[0], attach_first[1],
+                 "붙임이 하나뿐이면 번호를 붙이지 않는다", "붙임  ○○○ 1부.")
+        in_attach = False
         for i, l in nonempty:
             if _ATTACH_LINE.match(l):
                 in_attach = True
@@ -148,14 +229,19 @@ def lint_text(text):
                          "항목 기호는 1. → 가. → 1) → 가) → (1) → (가) → ① 순서")
                 seen_levels = [x for x in seen_levels if x < level] + [level]
                 break
+    _lone_sub_items(lines, findings)
+    if doc_type == "gonmun":
+        _gonmun_structure(lines, findings)
+    elif doc_type == "bogo":
+        _bogo_style(lines, findings)
     return {"findings": findings, "count": len(findings)}
 
 
-def lint_file(path):
+def lint_file(path, doc_type=None):
     path = Path(path)
     if path.suffix.lower() == ".hwpx":
         from core.analyze import extract_text
         text = extract_text(path)
     else:
         text = path.read_text(encoding="utf-8")
-    return lint_text(text)
+    return lint_text(text, doc_type=doc_type)

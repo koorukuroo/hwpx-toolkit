@@ -1,5 +1,6 @@
 """HWPX ZIP 패키지 IO — 읽기 + 바이트 보존 쓰기 (순수 stdlib)."""
 import io
+import os
 import re
 import struct
 import zipfile
@@ -45,6 +46,19 @@ def _local_record_span(data, info):
     fn_len, ex_len = struct.unpack("<HH", data[off + 26:off + 30])
     data_start = off + 30 + fn_len + ex_len
     return off, data_start, data_start + info.compress_size
+
+
+def atomic_write(dst, data):
+    """같은 디렉터리의 임시 파일에 쓴 뒤 os.replace — 중간에 실패해도 반쪽 파일이
+    dst 이름으로 남지 않는다."""
+    dst = Path(dst)
+    tmp = dst.with_name(f".{dst.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, dst)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
 
 
 def section_names(names):
@@ -159,7 +173,7 @@ class HwpxPackage:
         struct.pack_into("<HHII", eocd_rec, 8, total_entries, total_entries,
                          cd_size, cd_start)
         out.write(eocd_rec)
-        Path(dst).write_bytes(out.getvalue())
+        atomic_write(dst, out.getvalue())
 
     def extract_to(self, dirpath):
         base = Path(dirpath).resolve()

@@ -65,14 +65,16 @@ def px_to_hwp(px):
     return int(round(px / 96 * MM_PER_INCH * HWP_PER_MM))
 
 
-def pic_xml(pic_id, bin_id, w, h, px_w, px_h):
+def pic_xml(pic_id, bin_id, w, h, px_w, px_h, instid=None):
     org_w, org_h = px_to_hwp(px_w), px_to_hwp(px_h)
+    # instid는 개체 인스턴스 식별자 — 그림마다 달라야 한다 (0 공유 금지).
+    instid = str(instid) if instid is not None else str(pic_id)
     return (
         f'<hp:pic xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" '
         f'xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core" '
         f'id="{pic_id}" zOrder="0" numberingType="PICTURE" '
         'textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" '
-        'dropcapstyle="None" href="" groupLevel="0" instid="0" reverse="0">'
+        f'dropcapstyle="None" href="" groupLevel="0" instid="{instid}" reverse="0">'
         '<hp:offset x="0" y="0"/>'
         f'<hp:orgSz width="{org_w}" height="{org_h}"/>'
         f'<hp:curSz width="{w}" height="{h}"/>'

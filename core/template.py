@@ -24,7 +24,10 @@ def _ordered_names(names):
     return sorted(names, key=key)
 
 
-def build_from_template(dst, *, template="base", section_xml=None, title=None):
+def build_from_template(dst, *, template="base", section_xml=None, title=None,
+                        extra_files=None, manifest_items=None):
+    """템플릿 파일 + section0.xml(+ 추가 엔트리/manifest item) → HWPX. 그림(BinData)을
+    넣을 때는 extra_files={"BinData/image1.png": bytes}, manifest_items=[opf:item XML]."""
     tdir = TEMPLATES_DIR / template
     if not tdir.is_dir():
         raise PackageError(f"템플릿 없음: {template}")
@@ -41,6 +44,14 @@ def build_from_template(dst, *, template="base", section_xml=None, title=None):
         files[rel_str] = f.read_bytes()
     if section_xml is not None:
         files["Contents/section0.xml"] = section_xml.encode("utf-8")
+    for name, data in (extra_files or {}).items():
+        files[name] = data
+    if manifest_items:
+        if "Contents/content.hpf" not in files:
+            raise PackageError(f"템플릿에 content.hpf 없음: {template}")
+        hpf = files["Contents/content.hpf"].decode("utf-8")
+        files["Contents/content.hpf"] = hpf.replace(
+            "</opf:manifest>", "".join(manifest_items) + "</opf:manifest>", 1).encode("utf-8")
     if title is not None:
         if "Contents/content.hpf" not in files:
             raise PackageError(f"템플릿에 content.hpf 없음: {template}")

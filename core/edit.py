@@ -6,6 +6,7 @@ from pathlib import Path
 
 from core.errors import PackageError, EditError  # noqa: F401 (재노출)
 from core.package import HwpxPackage
+from core.text import t_model, t_text, t_write, set_t_text
 
 NS = {
     "hs": "http://www.hancom.co.kr/hwpml/2011/section",
@@ -67,21 +68,75 @@ class SectionEditor:
         return [t for run in p.findall(_q("run")) for t in run.findall(_q("t"))]
 
     def _para_text(self, p):
-        return "".join(t.text or "" for t in self._direct_ts(p))
+        return "".join(t_text(t) for t in self._direct_ts(p))
 
     def _max_id(self):
         best = 0
         for el in self.root.iter():
-            v = el.get("id")
-            if v and v.isdigit():
-                best = max(best, int(v))
+            for attr in ("id", "instid"):
+                v = el.get(attr)
+                if v and v.isdigit():
+                    best = max(best, int(v))
         return best
 
     def _mark(self, p):
         if p not in self._modified:
             self._modified.append(p)
 
+    def _renumber_ids(self, el, start):
+        """복제한 서브트리의 모든 숫자 id/instid를 새 번호로 바꾼다.
+        fieldBegin↔fieldEnd 짝(beginIDRef)은 서브트리 안에서 함께 갱신한다.
+        다음에 쓸 번호를 반환."""
+        mapping = {}
+        for node in el.iter():
+            for attr in ("id", "instid"):
+                v = node.get(attr)
+                if v and v.isdigit() and v != "0":
+                    if v not in mapping:
+                        mapping[v] = str(start)
+                        start += 1
+                    node.set(attr, mapping[v])
+        for node in el.iter():
+            ref = node.get("beginIDRef")
+            if ref in mapping:
+                node.set("beginIDRef", mapping[ref])
+        return start
+
     # ---- 문구 교체 (run 분할 대응) ----
+    def _replace_in_para(self, p, old, new):
+        """문단 하나 안에서 old→new 교체 (run 경계·인라인 요소 넘나듦). 건수 반환."""
+        ts = self._direct_ts(p)
+        if not ts:
+            return 0
+        concat0 = "".join(t_model(t)[0] for t in ts)
+        starts = [m.start() for m in re.finditer(re.escape(old), concat0)]
+        if not starts:
+            return 0
+        # 오른쪽 매치부터 처리하면 왼쪽 오프셋이 보존된다.
+        # 각 이터레이션마다 현재(직전 이터레이션에서 이미 반영된) 텍스트를
+        # 다시 읽어 pos를 재계산한다 — 동일 run 안에 여러 매치가 있을 때
+        # 먼저 처리한(오른쪽) 치환 결과가 tail로 그대로 이어져야 하므로
+        # 원본 텍스트를 캐시해 두면 안 된다.
+        for i in reversed(starts):
+            j = i + len(old)
+            models = [t_model(t) for t in ts]
+            pos = 0
+            first_done = False
+            for t, (txt, opaque) in zip(ts, models):
+                s, e = pos, pos + len(txt)
+                pos = e
+                if e <= i or s >= j:
+                    continue
+                head = txt[:i - s] if s < i else ""
+                tail = txt[j - s:] if e > j else ""
+                if not first_done:
+                    t_write(t, head + new + tail, opaque)
+                    first_done = True
+                else:
+                    t_write(t, tail, opaque)
+        self._mark(p)
+        return len(starts)
+
     def replace_text(self, mapping):
         report = {"replaced": {}, "not_found": []}
         for old, new in mapping.items():
@@ -89,41 +144,30 @@ class SectionEditor:
                 raise EditError("빈 문자열은 교체 대상이 될 수 없음")
             total = 0
             for p in self._paras():
-                ts = self._direct_ts(p)
-                if not ts:
-                    continue
-                concat0 = "".join(t.text or "" for t in ts)
-                starts = [m.start() for m in re.finditer(re.escape(old), concat0)]
-                if not starts:
-                    continue
-                # 오른쪽 매치부터 처리하면 왼쪽 오프셋이 보존된다.
-                # 각 이터레이션마다 현재(직전 이터레이션에서 이미 반영된) 텍스트를
-                # 다시 읽어 pos를 재계산한다 — 동일 run 안에 여러 매치가 있을 때
-                # 먼저 처리한(오른쪽) 치환 결과가 tail로 그대로 이어져야 하므로
-                # 원본 텍스트를 캐시해 두면 안 된다.
-                for i in reversed(starts):
-                    j = i + len(old)
-                    texts = [t.text or "" for t in ts]
-                    pos = 0
-                    first_done = False
-                    for t, txt in zip(ts, texts):
-                        s, e = pos, pos + len(txt)
-                        pos = e
-                        if e <= i or s >= j:
-                            continue
-                        head = txt[:i - s] if s < i else ""
-                        tail = txt[j - s:] if e > j else ""
-                        if not first_done:
-                            t.text = head + new + tail
-                            first_done = True
-                        else:
-                            t.text = tail
-                    total += 1
-                self._mark(p)
+                total += self._replace_in_para(p, old, new)
             report["replaced"][old] = total
             if total == 0:
                 report["not_found"].append(old)
         return report
+
+    def replace_in_para(self, pindex, old, new):
+        """pindex번째 문단(문서 순서, 셀·머리말 포함)에서만 교체."""
+        paras = self._paras()
+        if not 0 <= pindex < len(paras):
+            raise EditError(f"문단 인덱스 범위 밖: {pindex}")
+        return self._replace_in_para(paras[pindex], old, new)
+
+    def fill_field(self, pindex, field_index, text):
+        """pindex번째 문단의 field_index번째 누름틀에 값을 쓴다."""
+        paras = self._paras()
+        if not 0 <= pindex < len(paras):
+            raise EditError(f"문단 인덱스 범위 밖: {pindex}")
+        p = paras[pindex]
+        spans = self._field_spans(p)
+        if not 0 <= field_index < len(spans):
+            raise EditError(f"문단 {pindex}에 누름틀 {field_index}번 없음")
+        begin, inner = spans[field_index]
+        self._fill_field(p, begin, inner, text)
 
     # ---- 표 탐색 ----
     def _tables(self):
@@ -154,6 +198,70 @@ class SectionEditor:
                 return tbl, tc
         raise EditError(f"셀 없음: 표 {table_index} ({row},{col})")
 
+    _OBJECT_TAGS = ("tbl", "pic", "container", "rect", "ellipse", "line",
+                    "polygon", "curve", "arc", "ole", "equation", "textart",
+                    "connectLine", "ctrl")
+
+    def _has_object(self, p):
+        return any(run.find(_q(tag)) is not None
+                   for run in p.findall(_q("run")) for tag in self._OBJECT_TAGS)
+
+    def _dominant_run(self, p):
+        """문단에서 본문을 담기에 가장 알맞은 run — 글자가 가장 많은 run.
+        (제목 셀의 굵은 첫 run에 본문이 들어가는 사고를 줄인다.)"""
+        best, best_len = None, -1
+        for run in p.findall(_q("run")):
+            ts = run.findall(_q("t"))
+            if not ts:
+                continue
+            n = sum(len(t_text(t).strip()) for t in ts)
+            if n > best_len:
+                best, best_len = run, n
+        return best
+
+    def _field_spans(self, p):
+        """문단 안 누름틀(fieldBegin type=CLICK_HERE)마다 (fieldBegin, 값을 담는
+        run 목록)."""
+        out = []
+        begin, inner = None, []
+        for run in p.findall(_q("run")):
+            ctrl = run.find(_q("ctrl"))
+            fb = ctrl.find(_q("fieldBegin")) if ctrl is not None else None
+            fe = ctrl.find(_q("fieldEnd")) if ctrl is not None else None
+            if fb is not None and fb.get("type") == "CLICK_HERE" and begin is None:
+                begin, inner = fb, []
+                continue
+            if begin is None:
+                continue
+            if fe is not None:
+                out.append((begin, inner))
+                begin, inner = None, []
+            elif run.find(_q("t")) is not None:
+                inner.append(run)
+        return out
+
+    def _field_span(self, p):
+        spans = self._field_spans(p)
+        return spans[0] if spans else None
+
+    def _fill_field(self, p, begin, inner, text):
+        """누름틀 값 쓰기 — 첫 run에 값, 나머지 비우기, dirty="1" (한컴 계약:
+        dirty가 "1"이 아니면 내용을 안내문으로 취급한다)."""
+        if not inner:
+            # 값 run이 없으면 fieldBegin run 바로 뒤에 새 run을 만든다
+            parents = self._parents_map()
+            begin_run = parents[parents[begin]]
+            new_run = ET.Element(_q("run"), {"charPrIDRef": begin_run.get("charPrIDRef", "0")})
+            ET.SubElement(new_run, _q("t"))
+            p.insert(list(p).index(begin_run) + 1, new_run)
+            inner = [new_run]
+        ts = [t for run in inner for t in run.findall(_q("t"))]
+        set_t_text(ts[0], text)
+        for t in ts[1:]:
+            set_t_text(t, "")
+        begin.set("dirty", "1")
+        self._mark(p)
+
     def _set_cell_content(self, tc, text):
         sub = tc.find(_q("subList"))
         if sub is None:
@@ -162,26 +270,71 @@ class SectionEditor:
         if not paras:
             raise EditError("셀에 문단 없음")
         first = paras[0]
-        run = first.find(_q("run"))
+        span = self._field_span(first)
+        if span is not None:
+            self._fill_field(first, *span, text)
+            return
+        run = self._dominant_run(first)
+        if run is None:
+            run = first.find(_q("run"))
         if run is None:
             raise EditError("셀 문단에 run 없음")
         t = run.find(_q("t"))
         if t is None:
             t = ET.SubElement(run, _q("t"))
-        t.text = text
+        set_t_text(t, text)
         for other in self._direct_ts(first):
             if other is not t:
-                other.text = ""
+                set_t_text(other, "")
+        # 남은 문단: 글자만 있는 문단은 제거(빈 줄이 남지 않도록), 표·그림 등
+        # 개체가 있는 문단은 글자만 비운다.
         for extra in paras[1:]:
-            for tt in self._direct_ts(extra):
-                tt.text = ""
-            self._mark(extra)
+            if self._has_object(extra):
+                for tt in self._direct_ts(extra):
+                    set_t_text(tt, "")
+                self._mark(extra)
+            else:
+                sub.remove(extra)
+                if extra in self._modified:
+                    self._modified.remove(extra)
         self._mark(first)
 
     # ---- 셀/행 편집 ----
     def set_cell_text(self, table_index, row, col, text):
         _, tc = self._find_cell(table_index, row, col)
         self._set_cell_content(tc, text)
+
+    def set_cell_style(self, table_index, row, col, *, bg=None, border=None,
+                       width=None, row2=None, col2=None):
+        """셀(또는 사각 범위)의 배경색/테두리. header.xml에 borderFill을 복제해 붙인다."""
+        if bg is None and border is None:
+            raise EditError("변경할 서식 항목이 없음 (--bg 또는 --border)")
+        he = self._require_header()
+        r2 = row if row2 is None else row2
+        c2 = col if col2 is None else col2
+        if r2 < row or c2 < col:
+            raise EditError("범위는 (row,col) ≤ (row2,col2)")
+        cache = {}
+        n = 0
+        tbl = self._get_table(table_index)
+        for tc in tbl.iter(_q("tc")):
+            addr = tc.find(_q("cellAddr"))
+            if addr is None:
+                continue
+            r, c = int(addr.get("rowAddr")), int(addr.get("colAddr"))
+            if not (row <= r <= r2 and col <= c <= c2):
+                continue
+            base = tc.get("borderFillIDRef", "1")
+            if base not in cache:
+                cache[base] = he.clone_border_fill(base, bg=bg, border=border, width=width)
+            tc.set("borderFillIDRef", cache[base])
+            p = tc.find(f"{_q('subList')}/{_q('p')}")
+            if p is not None:
+                self._mark(p)
+            n += 1
+        if n == 0:
+            raise EditError(f"범위에 셀 없음: 표 {table_index} ({row},{col})-({r2},{c2})")
+        return n
 
     def add_row(self, table_index, cells):
         tbl = self._get_table(table_index)
@@ -194,16 +347,13 @@ class SectionEditor:
         if len(cells) != n_cols:
             raise EditError(f"열 수 불일치: 값 {len(cells)}개, 표 {n_cols}열")
         new_tr = copy.deepcopy(last)
-        next_id = self._max_id() + 1
+        next_id = self._renumber_ids(new_tr, self._max_id() + 1)
         new_row = len(trs)
         row_height = 0
         for tc, value in zip(new_tr.findall(_q("tc")), cells):
             addr = tc.find(_q("cellAddr"))
             addr.set("rowAddr", str(new_row))
-            sub = tc.find(_q("subList"))
-            for p in sub.findall(_q("p")):
-                p.set("id", str(next_id))
-                next_id += 1
+            for p in tc.iter(_q("p")):
                 for seg in p.findall(_q("linesegarray")):
                     p.remove(seg)
             self._set_cell_content(tc, value)
@@ -310,9 +460,8 @@ class SectionEditor:
             tcs = tr.findall(_q("tc"))
             template = tcs[-1] if pos >= len(tcs) else tcs[pos]
             new_tc = copy.deepcopy(template)
-            for p in new_tc.find(_q("subList")).findall(_q("p")):
-                p.set("id", str(next_id))
-                next_id += 1
+            next_id = self._renumber_ids(new_tc, next_id)
+            for p in new_tc.iter(_q("p")):
                 for seg in p.findall(_q("linesegarray")):
                     p.remove(seg)
             self._set_cell_content(new_tc, value)
@@ -473,9 +622,9 @@ class SectionEditor:
             if not ts:
                 ET.SubElement(hp.find(_q("run")), _q("t"))
                 ts = self._direct_ts(hp)
-            ts[0].text = text
+            set_t_text(ts[0], text)
             for t in ts[1:]:
-                t.text = ""
+                set_t_text(t, "")
             target_p = hp
         else:
             ctrl = ET.Element(_q("ctrl"))
@@ -492,7 +641,7 @@ class SectionEditor:
                 "merged": "0"})
             r = ET.SubElement(hp, _q("run"), {"charPrIDRef": "0"})
             t = ET.SubElement(r, _q("t"))
-            t.text = text
+            set_t_text(t, text)
             # secPr, colPr ctrl 뒤에 삽입
             idx = max(i for i, c in enumerate(list(run))
                       if c.tag in (_q("secPr"), _q("ctrl"))) + 1
@@ -580,11 +729,17 @@ class SectionEditor:
         if parent is None:
             raise EditError("기준 문단의 부모를 찾을 수 없음")
         new_p = copy.deepcopy(anchor)
-        new_p.set("id", str(self._max_id() + 1))
+        self._renumber_ids(new_p, self._max_id() + 1)
+        carrier = self._dominant_run(new_p)
         ts = self._direct_ts(new_p)
-        ts[0].text = text
-        for t in ts[1:]:
-            t.text = ""
+        if carrier is not None:
+            main = carrier.find(_q("t"))
+        else:
+            main = ts[0]
+        set_t_text(main, text)
+        for t in ts:
+            if t is not main:
+                set_t_text(t, "")
         for seg in new_p.findall(_q("linesegarray")):
             new_p.remove(seg)
         parent.insert(list(parent).index(anchor) + 1, new_p)
@@ -649,7 +804,8 @@ class SectionEditor:
         parents = {c: par for par in self.root.iter() for c in par}
         parent = parents[anchor]
         pid = self._max_id() + 1
-        pic_el = ET.fromstring(images.pic_xml(str(pid + 1), bin_id, w, h, px_w, px_h))
+        pic_el = ET.fromstring(images.pic_xml(str(pid + 1), bin_id, w, h, px_w, px_h,
+                                              instid=str(pid + 2)))
         p = ET.Element(_q("p"), {"id": str(pid), "paraPrIDRef": anchor.get("paraPrIDRef", "0"),
                                  "styleIDRef": "0", "pageBreak": "0",
                                  "columnBreak": "0", "merged": "0"})

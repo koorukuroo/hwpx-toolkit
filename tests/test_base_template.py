@@ -35,9 +35,9 @@ def test_header_itemcnt_consistency_and_style_map():
     for coll, child, expected in [
         ("fontfaces", "fontface", 7),
         ("borderFills", "borderFill", 4),
-        ("charProperties", "charPr", 5),
-        ("paraProperties", "paraPr", 6),
-        ("styles", "style", 1),
+        ("charProperties", "charPr", 7),      # 0-4 기본 + 5 굵게 + 6 코드
+        ("paraProperties", "paraPr", 10),     # 0-5 기본 + 6,7 목록 2·3단계 + 8 인용 + 9 코드
+        ("styles", "style", 23),              # 한컴 표준 스타일 23종
     ]:
         el = root.find(f".//{{{NS_HH}}}{coll}")
         children = el.findall(f"{{{NS_HH}}}{child}")

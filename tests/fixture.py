@@ -70,17 +70,29 @@ HEADER_XML = (
     'snapToGrid="1" suppressLineNumbers="0" checked="0">'
     '<hh:align horizontal="JUSTIFY" vertical="BASELINE"/>'
     '</hh:paraPr></hh:paraProperties>'
+    '<hh:tabProperties itemCnt="1">'
+    '<hh:tabPr id="0" autoTabLeft="0" autoTabRight="0"/>'
+    '</hh:tabProperties>'
+    '<hh:styles itemCnt="1">'
+    '<hh:style id="0" type="PARA" name="바탕글" engName="Normal" paraPrIDRef="0" '
+    'charPrIDRef="0" nextStyleIDRef="0" langID="1042" lockForm="0"/>'
+    '</hh:styles>'
     '</hh:refList></hh:head>'
 )
 
 SECTION_HEAD = (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" '
-    'xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">'
+    'xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" '
+    'xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core">'
     '<hp:p id="1000000001" paraPrIDRef="0" styleIDRef="0" pageBreak="0" '
     'columnBreak="0" merged="0">'
     '<hp:run charPrIDRef="0">'
     '<hp:secPr id="" textDirection="HORIZONTAL" spaceColumns="1134" tabStop="8000">'
+    '<hp:startNum pageStartsOn="BOTH" page="0" pic="0" tbl="0" equation="0"/>'
+    '<hp:visibility hideFirstHeader="0" hideFirstFooter="0" hideFirstMasterPage="0" '
+    'border="SHOW_ALL" fill="SHOW_ALL" hideFirstPageNum="0" hideFirstEmptyLine="0" '
+    'showLineNumber="0"/>'
     '<hp:pagePr landscape="WIDELY" width="59528" height="84186" gutterType="LEFT_ONLY">'
     '<hp:margin header="4252" footer="4252" gutter="0" left="8504" right="8504" '
     'top="5668" bottom="4252"/>'
@@ -216,4 +228,29 @@ def build_form_hwpx(path):
             ctype = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
             zf.writestr(zipfile.ZipInfo(name), text.encode("utf-8"),
                         compress_type=ctype)
+    return path
+
+
+def build_from_section(path, section_body, *, header_xml=None, extra_entries=None):
+    """SECTION_HEAD 뒤에 section_body(hp:p 조각들)를 붙인 패키지. 구조 검사·텍스트
+    모델 테스트처럼 임의 XML이 필요할 때 쓴다."""
+    path = Path(path)
+    section0 = SECTION_HEAD + section_body + "</hs:sec>"
+    entries = [
+        ("mimetype", MIMETYPE),
+        ("version.xml", VERSION_XML),
+        ("settings.xml", SETTINGS_XML),
+        ("META-INF/container.xml", CONTAINER_XML),
+        ("META-INF/manifest.xml", MANIFEST_XML),
+        ("Contents/content.hpf", CONTENT_HPF),
+        ("Contents/header.xml", header_xml or HEADER_XML),
+        ("Contents/section0.xml", section0),
+    ]
+    for name, data in (extra_entries or {}).items():
+        entries.append((name, data))
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, text in entries:
+            ctype = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
+            data = text if isinstance(text, bytes) else text.encode("utf-8")
+            zf.writestr(zipfile.ZipInfo(name), data, compress_type=ctype)
     return path

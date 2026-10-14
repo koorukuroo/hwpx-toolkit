@@ -16,7 +16,9 @@ def test_fill_targets_detects_all_kinds(tmp_path):
     p = build_form_hwpx(tmp_path / "form.hwpx")
     targets = fill_targets(p)["targets"]
     kinds = {t["kind"] for t in targets}
-    assert kinds == {"label-cell", "checkbox", "paren"}
+    assert kinds == {"label-cell", "checkbox", "paren", "inline"}
+    inline = next(t for t in targets if t["kind"] == "inline")
+    assert inline["label"] == "제출 부수" and inline["value"] == "일반(  )통"
     labels = {t["key"] for t in targets if t["kind"] == "label-cell"}
     assert labels == {"성명", "연락처"}
     boxes = {t["literal"] for t in targets if t["kind"] == "checkbox"}
@@ -350,10 +352,8 @@ def test_fill_targets_grid_not_clobbered_by_colliding_nested_address(tmp_path):
     assert not any(t.get("label") == "중첩" for t in targets)
 
 
-def test_fill_multi_section_target_reported_unmatched(tmp_path):
-    """멀티섹션 문서: section1 전용 타겟에 값을 채우려 하면 예외 없이
-    unmatched로 보고되고 section0은 그대로 남아야 한다 (멀티섹션 편집은
-    Phase 4 — v1은 section0만 지원)."""
+def test_fill_multi_section_target_is_filled(tmp_path):
+    """멀티섹션 문서: section1 전용 타겟도 채워지고 section0은 그대로 남는다."""
     src = build_form_hwpx(tmp_path / "form.hwpx")
     section1_xml = (SECTION_HEAD + _table(rows=[["섹션1전용", ""]])
                      + "</hs:sec>").encode("utf-8")
@@ -371,12 +371,13 @@ def test_fill_multi_section_target_reported_unmatched(tmp_path):
     assert sec1_tgt["section"] == "Contents/section1.xml"
 
     dst = tmp_path / "out.hwpx"
-    report = fill_file(src, dst, values={"섹션1전용": "값"})
-    assert report["unmatched"] == ["섹션1전용"]
-    assert report["filled"] == []
+    report = fill_file(src, dst, values={"섹션1전용": "값", "성명": "홍길동"})
+    assert report["unmatched"] == []
+    assert report["filled"] == ["성명", "섹션1전용"] and report["verified"] == ["성명", "섹션1전용"]
     text = extract_text(dst)
-    assert "값" not in text
-    assert "성명" in text and "연락처" in text     # section0 그대로
+    assert "섹션1전용 | 값" in text and "성명 | 홍길동" in text
+    assert "연락처" in text
+    assert not any(n.startswith(".out") for n in __import__("os").listdir(tmp_path))
 
 
 def test_fill_report_reflects_actual_outcomes(tmp_path):
