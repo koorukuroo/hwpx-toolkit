@@ -26,12 +26,15 @@ from-hwp도 기본 엔진(python, vendor/pyhwpx_hwp5)은 stdlib이며, rhwp 폴�
      ├─ "이미지 넣어줘/바꿔줘" → insert-image / list-images / resize-image / replace-image / delete-image
      ├─ "문단 추가" → add-para
      ├─ "파일 정상 확인" → check (편집 후엔 guard --reference 원본 병행)
+     ├─ "어떻게 보이는지/레이아웃 확인" → render --png 후 PNG를 Read로 보고 판단
      │   ├─ check가 char_border_bug 보고 → fix-borders 실행 후 재check
      ├─ "XML 직접 수정" → unpack → 편집 → pack --source
      ├─ .hwp 파일 + "HWPX로 변환해줘"(명시) → from-hwp(자동 check) → report 확인 → 통과 시 전달
      ├─ .hwp 파일 + 그 외 요청 → 변환 여부 먼저 확인 (자동 변환 금지)
      ├─ "공문서 작성법 검수/맞춤법 표기 확인" → lint [--doc-type gonmun|bogo]
-     └─ "보고서 양식으로 만들어줘" → new --template report
+     ├─ "보고서/계획서 양식으로 만들어줘" → new --theme report (Ⅰ·Ⅱ 번호 칩, 남색)
+     ├─ "공문으로 만들어줘" → new --theme gonmun (휴먼명조 15pt, □ ○ - 기호)
+     └─ "깔끔하게/모던하게" → new --theme modern (맑은 고딕, 파랑 포인트)
 
 ## 커맨드
 
@@ -41,7 +44,7 @@ from-hwp도 기본 엔진(python, vendor/pyhwpx_hwp5)은 stdlib이며, rhwp 폴�
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" unpack 문서.hwpx ./작업디렉토리/
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" pack ./작업디렉토리/ 결과.hwpx --source 문서.hwpx
     # 생성: 마크다운 → HWPX (제목/표/목록(3단계)/굵게·코드/인용/코드블록/그림/--- 쪽나눔)
-    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx [--title 제목]
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx [--theme base|gonmun|report|modern] [--title 제목]
     # 생성: section0.xml 직접 조립 (스타일 ID는 references/base-template-styles.md)
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" build --section sec.xml -o 결과.hwpx
     # 편집 (원본 보존: 변경 섹션 외 바이트 동일, 자동 check 게이트)
@@ -77,11 +80,15 @@ from-hwp도 기본 엔진(python, vendor/pyhwpx_hwp5)은 stdlib이며, rhwp 폴�
     # 변환
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" from-hwp 원본.hwp -o 변환.hwpx      # 기본 python 엔진(의존성 없음)
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" from-hwp 원본.hwp -o 변환.hwpx --engine rhwp   # Node.js 폴백 엔진 강제
+    # 미리보기 (Node.js 18+; 한컴 없이 쪽 단위 SVG/PNG — 줄바꿈은 근사)
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" render 문서.hwpx -o ./pages --png [--pages 1-2]
     # 검수
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" lint 문서.hwpx                       # 공문서 표기 검수 (JSON)
     python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" lint 문서.hwpx --doc-type gonmun     # + 수신·발신명의·시행·공개 구분 유무
-    # 템플릿
-    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx --template report
+    # 테마 (글꼴·색·목록 기호·표 선을 테마가 정한다 — 마크다운에 기호를 직접 쓰지 않는다)
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx --theme report   # 보고서: Ⅰ·Ⅱ 칩, 남색
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx --theme gonmun   # 공문: 휴먼명조 15pt
+    python3 "${CLAUDE_SKILL_DIR}/scripts/hwpx.py" new 입력.md -o 결과.hwpx --theme modern   # 현대: 맑은 고딕, 파랑
 
 ## 필수 규칙
 
@@ -184,6 +191,18 @@ from-hwp도 기본 엔진(python, vendor/pyhwpx_hwp5)은 stdlib이며, rhwp 폴�
     같은 셀의 글자만 있는 나머지 문단은 제거된다(표·그림이 있는 문단은 유지). 셀
     안 줄바꿈은 값에 `\n`을 넣으면 된다. 셀에 누름틀이 있으면 누름틀 안에 값이
     들어가고 `dirty="1"`이 된다.
+20. `new`는 요청 종류에 맞는 테마를 고른다: 보고서·계획서·제안서 → `report`, 공문·
+    공고·협조문 → `gonmun`, 사내 문서·안내문·깔끔한 문서 → `modern`, 그 밖에는 `base`.
+    마크다운에는 `-`와 `1.`만 쓴다 — 목록 기호(□ ○ - ·)와 번호 서식(1. 가. 1))은 테마가
+    바꿔 주므로 본문에 직접 적으면 기호가 두 번 나온다. `report`에서 `##` 장 제목은
+    번호 칩(Ⅰ·Ⅱ…)이 되므로 번호를 쓰려면 `## 1. 개요`처럼 제목 앞에 둔다.
+    YAML 머리말 `subtitle:`·`author:`·`date:`는 제목 아래 줄로 들어간다. `header:`·`footer:`는
+    머리말·꼬리말, `page_number: footer-center|header-right|none`은 쪽번호(report·gonmun 기본
+    footer-center). `[글자](url)`은 하이퍼링크, `[^1]`+`[^1]: 내용` 줄은 각주가 된다.
+21. 생성·편집 결과는 전달 전에 `render --png`로 한 번 보고(Read로 PNG 확인) 표가 좁거나
+    제목 체계가 어긋나면 고친다. 렌더는 근사(줄바꿈·문단 테두리·각주 위치)이므로 "한컴에서
+    이렇게 보인다"고 단정하지 말고, 구조 문제(표 폭, 여백, 빈 쪽, 목록 단계)만 판단한다.
+    Node.js가 없으면 render는 건너뛰고 사용자에게 한컴 확인을 요청한다.
 
 ## 포맷 상세
 

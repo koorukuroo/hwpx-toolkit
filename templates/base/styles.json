@@ -1,4 +1,5 @@
 {
+  "theme": "base",
   "heading": {
     "1": [
       "1",
@@ -18,19 +19,54 @@
     "0"
   ],
   "bullet_para": "4",
-  "table": {
-    "header_char": "4",
-    "header_border": "4",
-    "body_border": "3",
-    "cell_para": "5"
-  },
-  "bold_char": "5",
-  "code_char": "6",
   "bullet_levels": [
     "4",
     "6",
     "7"
   ],
+  "bullets": [
+    "•",
+    "-",
+    "·"
+  ],
+  "ordered": [
+    "{n}.",
+    "{n})",
+    "({n})"
+  ],
+  "table": {
+    "header_char": "4",
+    "header_border": "4",
+    "body_border": "3",
+    "cell_para": "5",
+    "cell_char": "7",
+    "cell_para_left": "10",
+    "header_border_top": "9",
+    "body_border_bottom": "10",
+    "header_border_both": "11",
+    "outer": "top-bottom",
+    "row_height": 2282
+  },
+  "bold_char": "5",
+  "code_char": "6",
   "quote_para": "8",
-  "code_para": "9"
+  "code_para": "9",
+  "caption": [
+    "9",
+    "11"
+  ],
+  "subtitle": [
+    "10",
+    "12"
+  ],
+  "link_char": "11",
+  "page_number": "none",
+  "h2_rule": {
+    "border": "6",
+    "char": "2",
+    "para": "10",
+    "size": 1400,
+    "prev": 800,
+    "next": 200
+  }
 }

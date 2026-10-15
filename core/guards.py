@@ -88,6 +88,25 @@ def _simple_text_length(p):
     return total
 
 
+def _secpr_ctrl_order(loc, p, warnings):
+    """구역 첫 문단의 컨트롤 순서: secPr → colPr → 머리말/꼬리말 (한컴 저장본 순서).
+    머리말/꼬리말이 colPr 앞에 오면 한컴에서 오른쪽이 잘리는 사례가 보고됐다."""
+    seq = []
+    for run in _children(p, "run"):
+        for c in run:
+            name = _local(c.tag)
+            if name == "secPr":
+                seq.append("secPr")
+            elif name == "ctrl":
+                seq.extend(_local(cc.tag) for cc in c)
+    if "secPr" not in seq or "colPr" not in seq:
+        return
+    hf = [i for i, x in enumerate(seq) if x in ("header", "footer")]
+    if hf and hf[0] < seq.index("colPr"):
+        warnings.append(f"secpr-ctrl-order: {loc} 머리말/꼬리말 ctrl이 colPr보다 앞에 있음 "
+                        "(한컴 순서: secPr → colPr → header/footer)")
+
+
 def _section_structure(sec_name, tree, errors, warnings):
     """섹션 하나의 한컴 필수 구조 검사."""
     loc = sec_name.rsplit("/", 1)[-1]
@@ -101,6 +120,17 @@ def _section_structure(sec_name, tree, errors, warnings):
             if pid and pid.isdigit() and pid not in _SHARED_PARA_IDS:
                 seen_p_ids[pid] = seen_p_ids.get(pid, 0) + 1
             length = _simple_text_length(el)
+            kids = list(el)
+            if any(_local(k.tag) == "linesegarray" for k in kids) \
+                    and _local(kids[-1].tag) != "linesegarray":
+                warnings.append(f"lineseg-not-last: {loc} 문단 id={pid} — linesegarray는 "
+                                "문단의 마지막 자식이어야 한다 (run이 뒤에 옴)")
+            _secpr_ctrl_order(loc, el, warnings)
+            nb = len(list(el.iter(f"{{{NS_HP}}}fieldBegin")))
+            ne = len(list(el.iter(f"{{{NS_HP}}}fieldEnd")))
+            if nb != ne:
+                warnings.append(f"field-spans-paragraphs: {loc} 문단 id={pid} fieldBegin {nb}개 / "
+                                f"fieldEnd {ne}개 — 문단을 넘는 누름틀·필드는 한컴이 지운다")
             for lsa in _children(el, "linesegarray"):
                 for seg in _children(lsa, "lineseg"):
                     tp = seg.get("textpos")

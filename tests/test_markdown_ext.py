@@ -27,9 +27,10 @@ def test_inline_bold_and_code_become_runs(tmp_path):
     assert "본문 굵게 와 코드 입니다." in extract_text(out)
 
 
-def test_report_template_uses_its_own_bold_ids():
-    xml = render_to_section("**굵게**", template="report")
-    assert 'charPrIDRef="7"' in xml
+def test_every_theme_uses_the_same_bold_id():
+    for theme in ("base", "gonmun", "report", "modern"):
+        xml = render_to_section("**굵게**", template=theme)
+        assert 'charPrIDRef="5"' in xml
 
 
 def test_nested_lists_by_indent(tmp_path):
@@ -41,7 +42,8 @@ def test_nested_lists_by_indent(tmp_path):
     out = build_from_template(tmp_path / "l.hwpx", section_xml=xml)
     assert check_package(out)["ok"]
     text = extract_text(out)
-    assert "• 상위" in text and "- 하위" in text and "· 세째" in text and "1. 하나의 하나" in text
+    assert "• 상위" in text and "- 하위" in text and "· 세째" in text
+    assert "1. 하나" in text and "1) 하나의 하나" in text      # base 번호 서식: 1. → 1) → (1)
 
 
 def test_hr_becomes_page_break_on_next_block(tmp_path):

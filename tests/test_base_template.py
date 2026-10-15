@@ -34,21 +34,21 @@ def test_header_itemcnt_consistency_and_style_map():
     root = ET.fromstring((BASE / "Contents/header.xml").read_bytes())
     for coll, child, expected in [
         ("fontfaces", "fontface", 7),
-        ("borderFills", "borderFill", 4),
-        ("charProperties", "charPr", 7),      # 0-4 기본 + 5 굵게 + 6 코드
-        ("paraProperties", "paraPr", 10),     # 0-5 기본 + 6,7 목록 2·3단계 + 8 인용 + 9 코드
+        ("borderFills", "borderFill", 11),    # 공통 배치 (references/base-template-styles.md)
+        ("charProperties", "charPr", 12),
+        ("paraProperties", "paraPr", 13),
         ("styles", "style", 23),              # 한컴 표준 스타일 23종
     ]:
         el = root.find(f".//{{{NS_HH}}}{coll}")
         children = el.findall(f"{{{NS_HH}}}{child}")
         assert int(el.get("itemCnt")) == len(children) == expected, coll
-    # 제목 charPr: 18pt 볼드
+    # 제목 charPr: 20pt 볼드
     char1 = root.find(f".//{{{NS_HH}}}charPr[@id='1']")
-    assert char1.get("height") == "1800"
+    assert char1.get("height") == "2000"
     assert char1.find(f"{{{NS_HH}}}bold") is not None
     # 표 헤더 borderFill 4는 배경색 보유
     bf4 = root.find(f".//{{{NS_HH}}}borderFill[@id='4']")
-    assert b"E6E6E6" in ET.tostring(bf4)
+    assert b"F2F2F2" in ET.tostring(bf4)
 
 
 def test_section_skeleton_first_para_has_secpr_and_colpr():

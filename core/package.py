@@ -71,6 +71,29 @@ def section_names(names):
     return [n for _, n in sorted(cands)]
 
 
+#: 압축 폭탄·비정상 패키지 방어 — 실물 최대(수백 MB 그림 문서)를 넉넉히 넘는 값.
+MAX_ENTRIES = 4096
+MAX_ENTRY_BYTES = 512 * 1024 * 1024
+MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+MAX_RATIO = 1000            # 풀린 크기 / 압축 크기 (10MB 넘는 엔트리만 검사)
+
+
+def _check_limits(path, zf):
+    infos = zf.infolist()
+    if len(infos) > MAX_ENTRIES:
+        raise PackageError(f"엔트리가 너무 많음({len(infos)} > {MAX_ENTRIES}): {path}")
+    total = 0
+    for i in infos:
+        if i.file_size > MAX_ENTRY_BYTES:
+            raise PackageError(f"엔트리가 너무 큼({i.file_size} bytes): {i.filename}")
+        if i.file_size > 10 * 1024 * 1024 and i.compress_size \
+                and i.file_size / i.compress_size > MAX_RATIO:
+            raise PackageError(f"압축비 비정상(압축 폭탄 의심): {i.filename}")
+        total += i.file_size
+    if total > MAX_TOTAL_BYTES:
+        raise PackageError(f"풀린 크기 합이 너무 큼({total} bytes): {path}")
+
+
 class HwpxPackage:
     def __init__(self, path, data, zf):
         self.path = Path(path)
@@ -91,6 +114,7 @@ class HwpxPackage:
             zf = zipfile.ZipFile(io.BytesIO(data))
         except zipfile.BadZipFile as e:
             raise PackageError(f"ZIP 손상: {path}: {e}") from e
+        _check_limits(path, zf)
         return cls(path, data, zf)
 
     def names(self):

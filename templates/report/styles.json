@@ -1,12 +1,13 @@
 {
+  "theme": "report",
   "heading": {
     "1": [
-      "5",
+      "1",
       "1"
     ],
     "2": [
       "2",
-      "6"
+      "2"
     ],
     "default": [
       "3",
@@ -18,23 +19,64 @@
     "0"
   ],
   "bullet_para": "4",
+  "bullet_levels": [
+    "4",
+    "6",
+    "7"
+  ],
+  "bullets": [
+    "□",
+    "○",
+    "-",
+    "·"
+  ],
+  "ordered": [
+    "{n}.",
+    "{ga}.",
+    "{n})",
+    "{ga})"
+  ],
   "table": {
     "header_char": "4",
     "header_border": "4",
     "body_border": "3",
-    "cell_para": "5"
+    "cell_para": "5",
+    "cell_char": "7",
+    "cell_para_left": "10",
+    "header_border_top": "9",
+    "body_border_bottom": "10",
+    "header_border_both": "11",
+    "outer": "top-bottom",
+    "row_height": 2682
   },
-  "section_bar": {
-    "char": "6",
-    "border": "5"
-  },
-  "bold_char": "7",
-  "code_char": "8",
-  "bullet_levels": [
-    "4",
-    "7",
-    "8"
+  "bold_char": "5",
+  "code_char": "6",
+  "quote_para": "8",
+  "code_para": "9",
+  "caption": [
+    "9",
+    "11"
   ],
-  "quote_para": "9",
-  "code_para": "10"
+  "subtitle": [
+    "10",
+    "12"
+  ],
+  "link_char": "11",
+  "page_number": "footer-center",
+  "title_rule": {
+    "border": "7",
+    "char": "1",
+    "para": "5",
+    "size": 2200,
+    "prev": 0,
+    "next": 800
+  },
+  "section_chip": {
+    "num_char": "8",
+    "num_border": "5",
+    "title_char": "2",
+    "title_border": "8",
+    "size": 1600,
+    "numbering": "roman"
+  }
 }

@@ -63,8 +63,9 @@ ln -s "$(pwd)" ~/.claude/skills/hwpx-toolkit
 
 | 커맨드 | 설명 |
 |--------|------|
-| `new <input.md> -o <out> [--template base\|report] [--title 제목]` | 마크다운 → HWPX. 제목·3단계 목록·GitHub 표·`**굵게**`·`` `코드` ``·인용·코드 블록·`---` 쪽나눔·그림(PNG/JPEG)·YAML 머리말 |
-| `build --section <sec.xml> -o <out> [--template] [--title]` | section0.xml을 직접 써서 조립 |
+| `new <input.md> -o <out> [--theme base\|gonmun\|report\|modern] [--title 제목]` | 마크다운 → HWPX. 제목·3단계 목록·GitHub 표·`**굵게**`·`` `코드` ``·인용·코드 블록·`---` 쪽나눔·그림(PNG/JPEG)·YAML 머리말. 글꼴·색·목록 기호·표 선은 테마가 정합니다 |
+| `build --section <sec.xml> -o <out> [--theme] [--title]` | section0.xml을 직접 써서 조립 |
+| `render <file> -o <dir> [--format svg\|html] [--pages 2-4] [--png]` | 쪽 미리보기. 한컴 없이 `page-N.svg`(macOS는 `--png`로 PNG까지)를 만들어 레이아웃을 눈으로 확인합니다. 동봉 rhwp 렌더러(Node.js 18+) 사용 |
 | `from-hwp <input.hwp> -o <out> [--engine auto\|python\|rhwp]` | HWP 5.x 바이너리 → HWPX. 기본 python 엔진은 글자·문단·테두리·글머리표·표 안의 표·그림·각주·쪽번호·줄바꿈·용지 여백을 보존하고, 옮기지 못한 내용을 `report`에 종류별 개수로 남깁니다. rhwp는 Node.js 폴백 |
 
 ### 편집 — 텍스트·양식
@@ -114,10 +115,21 @@ ln -s "$(pwd)" ~/.claude/skills/hwpx-toolkit
 ### 마크다운으로 보고서 만들기
 
 ```bash
-python3 scripts/hwpx.py new 사업계획.md -o 사업계획.hwpx --template report
+python3 scripts/hwpx.py new 사업계획.md -o 사업계획.hwpx --theme report
 ```
 
-`report` 템플릿은 16pt 제목과 진남색 섹션 바를 씁니다(`##` 제목이 바로 렌더링됨). 일반 문서는 `--template base`(기본값)를 씁니다. 지원 문법은 `#`~`######` 제목, `-`/`*` 불릿과 `1.` 번호 목록(2칸 들여쓰기마다 한 단계, 3단계까지), GitHub 표, `> 인용`, ``` 코드 블록, `---`(다음 블록 앞에서 쪽 나눔), `![설명](그림.png)`(.md 기준 상대 경로, 본문 폭을 넘으면 축소), 맨 앞 YAML 머리말(`title:`), 빈 줄로 나뉘는 문단입니다. `**굵게**`와 `` `코드` ``는 별도 글자 서식으로 들어갑니다. 두 템플릿 모두 한컴 표준 스타일 23종(바탕글·본문·개요 1~10·쪽 번호·머리말·각주·미주·메모·차례·캡션)을 갖습니다.
+테마는 네 가지입니다. 같은 마크다운이 테마에 따라 다른 글꼴·크기·색·목록 기호·표 선으로 나옵니다.
+
+| 테마 | 글꼴 (본문 / 제목) | 본문 | 제목 | 장 제목(`##`) | 목록 기호 | 표 |
+|------|---------------------|------|------|---------------|-----------|-----|
+| `base` (기본) | 함초롬바탕 / 함초롬돋움 | 11pt 160% | 20pt 남색 가운데 | 14pt 남색 + 회색 밑선 | • - · / 1. 1) (1) | 연회색 머리글, 회색 안쪽 선, 위·아래 0.4mm 검정 선 |
+| `gonmun` (공문) | 휴먼명조 / HY헤드라인M | 15pt 160% | 20pt 가운데 | 15pt 굵게 | □ ○ - · / 1. 가. 1) 가) | 머리글 배경 없음, 위·아래 0.4mm 굵은 선 |
+| `report` (보고서) | 휴먼명조 / HY헤드라인M | 15pt 160% | 22pt 남색 + 밑줄 바 | **Ⅰ·Ⅱ 번호 칩** (남색 번호 칸 + 밑선) | □ ○ - · / 1. 가. 1) 가) | 연남색 머리글, 위·아래 남색 굵은 선 |
+| `modern` (현대) | 맑은 고딕 | 11pt 170% 왼쪽 정렬 | 24pt 왼쪽 + 파란 밑선 | 14pt 파랑 | • – · / 1. 1) (1) | 연회색 머리글, 회색 선 |
+
+`report`·`gonmun` 테마는 꼬리말 가운데 쪽번호를 기본으로 넣습니다(`page_number: none`으로 끔). 표 안 글자는 모든 테마에서 제목 글꼴(돋움 계열)을 쓰고 셀 여백은 한글 기본값(좌우 1.8mm)이며, 본문은 한글 글자 단위 줄나눔이라 양쪽정렬에서 단어 사이가 벌어지지 않습니다. 공통으로 목록은 내어쓰기(둘째 줄이 기호 뒤에 정렬)이고, 표는 열 폭을 내용 길이에 비례해 나누며 짧은 값만 있는 열은 가운데·긴 글은 왼쪽 정렬, 긴 셀이 있는 행은 높이를 늘립니다. `report` 테마의 `## 1. 개요`, `## Ⅲ 추진 계획`, `## 제2장 ...`은 번호를 칩에 넣고, 번호가 없으면 순서대로 Ⅰ, Ⅱ, …를 붙입니다. YAML 머리말의 `subtitle:`, `author:`, `date:`는 제목 아래 회색 줄로, 그림의 `![설명](...)` 설명은 캡션으로 들어갑니다. HY헤드라인M·휴먼명조·맑은 고딕이 없는 환경에서는 한컴이 대체 글꼴로 보여 줍니다.
+
+지원 문법은 `#`~`######` 제목, `-`/`*` 불릿과 `1.` 번호 목록(2칸 들여쓰기마다 한 단계, 3단계까지), GitHub 표, `> 인용`, ``` 코드 블록, `---`(다음 블록 앞에서 쪽 나눔), `![설명](그림.png)`(.md 기준 상대 경로, 본문 폭을 넘으면 축소), 맨 앞 YAML 머리말(`title:`·`subtitle:`·`author:`·`date:`·`header:`·`footer:`·`page_number: footer-center|header-right|none`), `[글자](https://…)` 하이퍼링크, `[^1]` 각주(본문 어디든 `[^1]: 각주 내용` 줄로 정의), 빈 줄로 나뉘는 문단입니다. `**굵게**`와 `` `코드` ``는 별도 글자 서식으로 들어갑니다. `author:`는 문서 정보의 작성자로, 생성 시각은 CreatedDate/ModifiedDate로 기록됩니다. 모든 테마가 한컴 표준 스타일 23종(바탕글·본문·개요 1~10·쪽 번호·머리말·각주·미주·메모·차례·캡션)을 갖습니다.
 
 ### 받은 양식 채우기
 
@@ -175,11 +187,13 @@ python3 scripts/hwpx.py lint 공고문.hwpx                     # 표기 검수
 
 **바이트 보존.** 편집은 ZIP을 통째로 다시 쓰지 않습니다. 변경된 XML 파트만 교체하고 나머지 엔트리는 로컬 헤더와 압축 바이트까지 원본 그대로 복사합니다. `guard --reference`로 이를 검사할 수 있고, 아무것도 고치지 않은 재작성은 원본과 완전히 동일한 파일을 만듭니다.
 
+**눈으로 확인.** `render`는 동봉한 rhwp 렌더러로 쪽을 SVG/PNG로 그립니다. 글자 폭을 근사하므로 줄바꿈 위치가 한컴과 조금 다를 수 있고 문단 테두리·각주 배치는 단순화되지만, 표 폭·여백·제목 체계·목록 들여쓰기 같은 레이아웃 문제를 한컴 없이 잡아낼 수 있습니다. 최종 확인은 한컴오피스에서 합니다.
+
 **게이트 우선.** XML이 유효해도 한컴이 문서를 못 여는 경우가 있습니다. `check`는 구조 검증에 더해 실제로 겪었던 사고 패턴(줄 배치 캐시 불일치로 인한 손상 경고, 글자마다 테두리가 생기는 charPr 버그, 세로쓰기 오변환, 매니페스트와 어긋난 이미지 참조)을 잡아냅니다. 편집 커맨드는 이 게이트를 자동으로 통과해야 결과를 내놓습니다.
 
 **클린룸.** 모든 코드는 OWPML(KS X 6101) 표준과 실제 한컴 문서 관찰을 근거로 직접 작성했습니다. 외부 컴포넌트는 HWP 변환용 두 가지(`vendor/pyhwpx_hwp5/` python-hwpx HWP5 리더 포팅본 Apache-2.0, `vendor/rhwp/` @rhwp/core WASM MIT)뿐이며 각 라이선스와 함께 동봉하고 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 고지했습니다.
 
-**템플릿은 생성기로만.** `templates/`의 파일은 손으로 고치지 않습니다. `scripts/dev/gen_templates.py`를 수정해 재실행하며, 테스트가 생성 결과의 재현성을 확인합니다.
+**템플릿은 생성기로만.** `templates/`의 파일은 손으로 고치지 않습니다. `scripts/dev/gen_templates.py`의 `THEMES` 표(글꼴·크기·색·선·기호)를 수정해 재실행하며, 테스트가 생성 결과의 재현성을 확인합니다. 네 테마는 같은 스타일 ID 배치를 쓰므로 렌더러는 테마를 구분하지 않습니다.
 
 ---
 
@@ -203,8 +217,10 @@ python3 scripts/hwpx.py lint 공고문.hwpx                     # 표기 검수
 
 ```bash
 python3 -m pytest tests/ -v          # 1개는 HWPX_TEST_HWP 실물 .hwp 환경 필요
-python3 scripts/dev/gen_templates.py # 템플릿 재생성 (base, report)
+python3 scripts/dev/gen_templates.py # 테마 템플릿 재생성 (base, gonmun, report, modern)
 ```
+
+`check`는 구조 오류 외에 한컴 저장본과 어긋나는 순서도 경고로 알립니다: `lineseg-not-last`(linesegarray 뒤에 run), `secpr-ctrl-order`(머리말/꼬리말 ctrl이 colPr보다 앞), `field-spans-paragraphs`(문단을 넘는 누름틀·필드). `lint`는 날짜·시간·금액·붙임·끝 표기 외에 물결표 붙여쓰기, 요일 괄호, 법령명 낫표, 자주 틀리는 띄어쓰기(`50여명`→`50여 명`, `제 4차`→`제4차` 등)도 짚습니다.
 
 HWP 변환 테스트는 동봉 픽스처(`tests/fixtures/labor_template.hwp`)로 python 엔진을 검사하고, rhwp 경로는 Node.js가 없으면 건너뜁니다. 다른 `.hwp` 파일로 검증하려면:
 
@@ -218,7 +234,7 @@ HWPX_TEST_HWP=/경로/샘플.hwp python3 -m pytest tests/test_convert.py -v
 |------|------|
 | [SKILL.md](SKILL.md) | Claude 스킬 진입점 — 워크플로우 의사결정 트리와 필수 규칙 |
 | [references/owpml-format.md](references/owpml-format.md) | OWPML 패키지 구조, 네임스페이스, HWPUNIT 단위, 필수 불변식 |
-| [references/base-template-styles.md](references/base-template-styles.md) | 템플릿 스타일 ID 맵 (charPr/paraPr/borderFill) |
+| [references/base-template-styles.md](references/base-template-styles.md) | 테마 템플릿 공통 스타일 ID 맵 (charPr/paraPr/borderFill)과 테마별 값 |
 | [references/gonmun-rules.md](references/gonmun-rules.md) | 공문서 검수 규칙 |
 | [docs/hancom-verification.md](docs/hancom-verification.md) | 한컴오피스 실물 검증 절차와 기록 |
 | `docs/superpowers/specs/`, `docs/superpowers/plans/` | 설계 스펙과 단계별 구현 계획 |
@@ -238,10 +254,11 @@ core/           # 순수 stdlib 코어
   guards.py     #   validate / check / guard
   lint.py       #   공문서 표기 검수
   convert.py    #   HWP→HWPX (python 엔진 우선, rhwp 폴백 + 용지 설정 복원)
+  render.py     #   쪽 미리보기 (rhwp SVG/HTML, macOS PNG)
 scripts/hwpx.py # 단일 CLI 진입점
-templates/      # base, report (생성기 산출물)
+templates/      # base, gonmun, report, modern 테마 (생성기 산출물)
 vendor/pyhwpx_hwp5/  # python-hwpx HWP5 리더의 stdlib 포팅본 (Apache-2.0)
-vendor/rhwp/    # @rhwp/core WASM (MIT, 폴백)
+vendor/rhwp/    # @rhwp/core WASM (MIT, 변환 폴백 + 쪽 미리보기 렌더러)
 ```
 
 ---

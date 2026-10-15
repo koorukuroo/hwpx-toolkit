@@ -2,6 +2,7 @@
 """hwpx-toolkit 단일 CLI. 사용: python3 scripts/hwpx.py <command> ..."""
 import argparse
 import json
+from datetime import datetime, timezone
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -76,9 +77,30 @@ def cmd_new(args):
     title = args.title or md_mod.first_heading(text) or src.stem
     section, assets, manifest = md_mod.render_document(
         text, template=args.template, base_dir=src.parent)
+    meta, _ = md_mod.split_front_matter(text)
+    try:
+        deco = md_mod.document_decorations(text, args.template)
+    except ValueError as e:
+        raise PackageError(str(e)) from e
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     build_from_template(args.output, template=args.template,
                         section_xml=section, title=title,
-                        extra_files=assets, manifest_items=manifest)
+                        extra_files=assets, manifest_items=manifest,
+                        creator=meta.get("author"), created=now, modified=now)
+    if deco["header"] or deco["footer"] or deco["page_number"]:
+        # 머리말·꼬리말·쪽번호는 편집 경로(한컴 검증된 구조)로 덧붙인다
+        tmp = _tmp_for(args.output)
+
+        def decorate(ed):
+            if deco["header"]:
+                ed.set_header_footer("header", deco["header"], align="center")
+            if deco["footer"]:
+                ed.set_header_footer("footer", deco["footer"], align="center")
+            if deco["page_number"]:
+                where, align = deco["page_number"]
+                ed.set_page_number(where=where, align=align)
+        edit_mod.edit_file(args.output, tmp, decorate)
+        os.replace(tmp, args.output)
     return _finish_generated(args.output)
 
 
@@ -303,6 +325,14 @@ def cmd_check(args):
     return 0 if result["ok"] else 2
 
 
+def cmd_render(args):
+    from core import render as render_mod
+    result = render_mod.render_pages(args.file, args.out, fmt=args.format, pages=args.pages,
+                                     png=args.png)
+    print(json.dumps({"ok": True, **result}, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_from_hwp(args):
     result = convert_mod.hwp_to_hwpx(args.input, args.output, engine=args.engine)
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -361,14 +391,15 @@ def build_parser():
     n = sub.add_parser("new", help="마크다운 → HWPX 생성")
     n.add_argument("input")
     n.add_argument("-o", "--output", required=True)
-    n.add_argument("--template", default="base")
+    n.add_argument("--template", "--theme", dest="template", default="base",
+                   help="테마 템플릿: base(기본) | gonmun(공문) | report(보고서) | modern(현대)")
     n.add_argument("--title")
     n.set_defaults(func=cmd_new)
 
     b = sub.add_parser("build", help="header+section 조립")
     b.add_argument("--section")
     b.add_argument("-o", "--output", required=True)
-    b.add_argument("--template", default="base")
+    b.add_argument("--template", "--theme", dest="template", default="base")
     b.add_argument("--title")
     b.set_defaults(func=cmd_build)
 
@@ -550,6 +581,14 @@ def build_parser():
     ck = sub.add_parser("check", help="전달 전 필수 게이트 (validate + 사고 패턴)")
     ck.add_argument("file")
     ck.set_defaults(func=cmd_check)
+
+    rd = sub.add_parser("render", help="쪽 미리보기 (SVG/HTML, rhwp 렌더러·Node.js 필요)")
+    rd.add_argument("file")
+    rd.add_argument("-o", "--out", required=True, help="page-N.svg 를 쓸 디렉터리")
+    rd.add_argument("--format", choices=["svg", "html"], default="svg")
+    rd.add_argument("--pages", help="예: 1 또는 2-4 (기본 전체)")
+    rd.add_argument("--png", action="store_true", help="macOS qlmanage로 PNG도 생성")
+    rd.set_defaults(func=cmd_render)
 
     fh = sub.add_parser("from-hwp", help="HWP(5.x) → HWPX 변환 (기본 python 엔진, 의존성 없음)")
     fh.add_argument("input")

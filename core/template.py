@@ -24,8 +24,20 @@ def _ordered_names(names):
     return sorted(names, key=key)
 
 
+def _opf_meta(creator=None, created=None, modified=None):
+    items = []
+    if creator:
+        items.append(f'<opf:meta name="creator" content="text">{_xml_escape(creator)}</opf:meta>')
+    if created:
+        items.append(f'<opf:meta name="CreatedDate" content="text">{_xml_escape(created)}</opf:meta>')
+    if modified:
+        items.append(f'<opf:meta name="ModifiedDate" content="text">{_xml_escape(modified)}</opf:meta>')
+    return "".join(items)
+
+
 def build_from_template(dst, *, template="base", section_xml=None, title=None,
-                        extra_files=None, manifest_items=None):
+                        extra_files=None, manifest_items=None, creator=None,
+                        created=None, modified=None):
     """템플릿 파일 + section0.xml(+ 추가 엔트리/manifest item) → HWPX. 그림(BinData)을
     넣을 때는 extra_files={"BinData/image1.png": bytes}, manifest_items=[opf:item XML]."""
     tdir = TEMPLATES_DIR / template
@@ -59,6 +71,13 @@ def build_from_template(dst, *, template="base", section_xml=None, title=None,
         files["Contents/content.hpf"] = hpf.replace(
             "<opf:title>무제</opf:title>",
             f"<opf:title>{_xml_escape(title)}</opf:title>", 1).encode("utf-8")
+    meta_xml = _opf_meta(creator, created, modified)
+    if meta_xml:
+        if "Contents/content.hpf" not in files:
+            raise PackageError(f"템플릿에 content.hpf 없음: {template}")
+        hpf = files["Contents/content.hpf"].decode("utf-8")
+        files["Contents/content.hpf"] = hpf.replace(
+            "</opf:metadata>", meta_xml + "</opf:metadata>", 1).encode("utf-8")
     dst = Path(dst)
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zf:
         for name in _ordered_names(files):

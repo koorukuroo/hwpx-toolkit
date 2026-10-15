@@ -1,0 +1,72 @@
+{
+  "theme": "modern",
+  "heading": {
+    "1": [
+      "1",
+      "1"
+    ],
+    "2": [
+      "2",
+      "2"
+    ],
+    "default": [
+      "3",
+      "3"
+    ]
+  },
+  "body": [
+    "0",
+    "0"
+  ],
+  "bullet_para": "4",
+  "bullet_levels": [
+    "4",
+    "6",
+    "7"
+  ],
+  "bullets": [
+    "•",
+    "–",
+    "·"
+  ],
+  "ordered": [
+    "{n}.",
+    "{n})",
+    "({n})"
+  ],
+  "table": {
+    "header_char": "4",
+    "header_border": "4",
+    "body_border": "3",
+    "cell_para": "5",
+    "cell_char": "7",
+    "cell_para_left": "10",
+    "header_border_top": "9",
+    "body_border_bottom": "10",
+    "header_border_both": "11",
+    "outer": "none",
+    "row_height": 2282
+  },
+  "bold_char": "5",
+  "code_char": "6",
+  "quote_para": "8",
+  "code_para": "9",
+  "caption": [
+    "9",
+    "11"
+  ],
+  "subtitle": [
+    "10",
+    "12"
+  ],
+  "link_char": "11",
+  "page_number": "none",
+  "title_rule": {
+    "border": "7",
+    "char": "1",
+    "para": "10",
+    "size": 2400,
+    "prev": 0,
+    "next": 600
+  }
+}

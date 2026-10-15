@@ -27,31 +27,36 @@ def test_style_maps_exist_and_generator_idempotent():
 def test_report_header_has_extra_styles():
     root = ET.fromstring((TEMPLATES_DIR / "report/Contents/header.xml").read_bytes())
     chars = root.find(f".//{{{NS_HH}}}charProperties")
-    assert chars.get("itemCnt") == "9"      # 0-6 + 굵게(7) + 코드(8)
-    c6 = root.find(f".//{{{NS_HH}}}charPr[@id='6']")
-    assert c6.get("textColor") == "#FFFFFF"
+    assert chars.get("itemCnt") == "12"     # 공통 배치 (base와 같은 개수)
+    c8 = root.find(f".//{{{NS_HH}}}charPr[@id='8']")
+    assert c8.get("textColor") == "#FFFFFF"     # 포인트색 위 흰 글자 (칩 번호)
     bf5 = root.find(f".//{{{NS_HH}}}borderFill[@id='5']")
-    assert b"1F3864" in ET.tostring(bf5)
+    assert b"1F3864" in ET.tostring(bf5)        # 포인트색 배경
+    c1 = root.find(f".//{{{NS_HH}}}charPr[@id='1']")
+    assert c1.get("height") == "2200" and c1.get("textColor") == "#1F3864"
 
 
-def test_report_markdown_uses_section_bar(tmp_path):
+def test_report_markdown_uses_section_chip(tmp_path):
     md = "# 보고서\n\n## 1. 개요\n\n본문\n\n- 항목\n"
     xml = render_to_section(md, template="report")
     out = build_from_template(tmp_path / "r.hwpx", template="report", section_xml=xml,
                               title="보고서")
     assert check_package(out)["ok"]
     doc = analyze_document(out)
-    assert doc["sections"][0]["tables"] == [{"index": 0, "rows": 1, "cols": 1}]  # 섹션 바
+    # 제목(아래선 1칸 표) + 번호 칩
+    assert doc["sections"][0]["tables"] == [{"index": 0, "rows": 1, "cols": 1},
+                                             {"index": 1, "rows": 1, "cols": 3}]
     text = extract_text(out)
-    assert "1. 개요" in text and "• 항목" in text
-    assert 'charPrIDRef="5"' in xml          # H1 = report 제목 스타일
+    assert "Ⅰ |  | 개요" in text and "□ 항목" in text    # 1. → Ⅰ 칩, 보고서 기호 □
+    assert 'charPrIDRef="1"' in xml          # H1 = 제목 스타일
 
 
-def test_base_rendering_unchanged(tmp_path):
+def test_base_rendering_uses_rule_table_for_h2(tmp_path):
     md = "# 제목\n\n## 소제목\n\n본문"
     xml = render_to_section(md, template="base")
-    assert 'charPrIDRef="1"' in xml and 'paraPrIDRef="2"' in xml
-    assert "<hp:tbl" not in xml
+    assert 'charPrIDRef="1"' in xml                       # 제목 문단 (base 제목은 선 없음)
+    assert 'charPrIDRef="2"><hp:t>소제목' in xml           # ## 는 셀 아래선 표
+    assert xml.count("<hp:tbl") == 1 and 'borderFillIDRef="6"' in xml
 
 
 def test_report_table_uses_style_map(tmp_path):

@@ -51,7 +51,9 @@ def test_render_roundtrip(tmp_path):
                      "1. 단계 하나", "인건비 | 100"):
         assert expected in text
     doc = analyze_document(out)
-    assert doc["sections"][0]["tables"] == [{"index": 0, "rows": 3, "cols": 2}]
+    # base 테마의 ## 는 아래선 1칸 표, 그 뒤 마크다운 표
+    assert doc["sections"][0]["tables"] == [{"index": 0, "rows": 1, "cols": 1},
+                                             {"index": 1, "rows": 3, "cols": 2}]
 
 
 def test_multiline_paragraph_joined():

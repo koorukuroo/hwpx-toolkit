@@ -47,6 +47,34 @@ _SIHAENG = re.compile(r"^\s*시행\s")
 _DISCLOSURE = re.compile(r"(부분공개|비공개|공개)")
 _BALSIN = re.compile(r"^\s*[가-힣·\s]{2,25}(장|관|감|이사장|총장|원장|대표)\s*$")
 _BOGO_SENTENCE = re.compile(r"(습니다|입니다|합니다|됩니다|있습니다)\.?\s*$")
+#: 물결표는 앞말·뒷말에 붙여 쓴다 (4. 23. ~ 6. 15. → 4. 23.~6. 15.)
+_TILDE_SPACED = re.compile(r"(\S)\s+[~∼]\s*(\S)|(\S)\s*[~∼]\s+(\S)")
+#: 날짜 뒤 요일 괄호는 붙여 쓴다 (2023. 11. 11. (토) → 2023. 11. 11.(토))
+_WEEKDAY_SPACED = re.compile(r"(\d{1,2}\.)\s+(\([월화수목금토일]\))")
+#: 법령·규정 이름은 낫표 「 」 (큰따옴표·작은따옴표 대신)
+_LAW_QUOTED = re.compile(r"[\"'“‘]([가-힣·\s]{2,40}?(?:법|법률|규정|규칙|조례|지침|시행령|시행규칙|훈령|예규))[\"'”’]")
+#: 자주 틀리는 띄어쓰기 (편람 예시 기반, 보수적으로 고른 것만)
+_SPACING_FIXES = [
+    (re.compile(r"(\d+)여명"), r"\1여 명", "'여'는 접미사로 붙이고 단위 '명'은 띄운다"),
+    (re.compile(r"(\d+)명\s+당\b"), r"\1명당", "'-당'은 접미사이므로 붙여 쓴다"),
+    (re.compile(r"(일주일|한\s?달|하루|이틀|\d+일)\s+가량"), r"\1가량", "'-가량'은 접미사이므로 붙여 쓴다"),
+    (re.compile(r"([가-힣]+인)\s+바\b"), r"\1바", "'-인바'는 붙여 쓴다"),
+    (re.compile(r"\b그\s+동안\b"), "그동안", "'그동안'은 한 단어"),
+    (re.compile(r"\b더욱\s+더\b"), "더욱더", "'더욱더'는 한 단어"),
+    (re.compile(r"\b(두|세|네|다섯|여섯)가지\b"), r"\1 가지", "수관형사와 의존명사 '가지'는 띄운다"),
+    (re.compile(r"\b안됩니다\b"), "안 됩니다", "'안'은 부사이므로 띄운다"),
+    (re.compile(r"(\d+\s?%)(이상|이하|미만|초과|이내)"), r"\1 \2", "숫자·단위 뒤 '이상/이하/미만/초과/이내'는 띄운다"),
+    (re.compile(r"(\d+(?:년|개월|일|시간|회|명|개|건|부|매|장|억|만))(이상|이하|미만|초과|이내|내|전|후|간)(?![가-힣])"),
+     r"\1 \2", "숫자·단위 뒤 '이상/이내/전/후/간' 등은 띄운다"),
+    (re.compile(r"\b방과후\b"), "방과 후", "'방과 후'는 띄운다"),
+    (re.compile(r"\b사용중인\b"), "사용 중인", "'중'은 의존명사이므로 띄운다"),
+    (re.compile(r"\b변동없음\b"), "변동 없음", "'없음'은 띄운다"),
+    (re.compile(r"\b각(\d+)부\b"), r"각 \1부", "'각'은 관형사이므로 띄운다"),
+    (re.compile(r"\b매학교\b"), "매 학교", "'매'는 관형사이므로 띄운다"),
+    (re.compile(r"\b제\s+(\d+)(차|회|조|항|호|장|기|분과)"), r"제\1\2", "'제-'는 접두사이므로 붙여 쓴다"),
+    (re.compile(r"(?<![가-힣])귀\s+(교|사|원|청|기관|부서)"), r"귀\1", "'귀교/귀사'는 한 단어"),
+    (re.compile(r"(\([월화수목금토일]\))\s+(까지|부터)"), r"\1\2", "조사 '까지/부터'는 붙여 쓴다"),
+]
 
 
 def _range_redundant(line):
@@ -179,6 +207,18 @@ def lint_text(text, doc_type=None):
             _add(findings, "range-redundant", i, line,
                  "물결표 범위와 '까지'는 함께 쓰지 않는다")
         line_no_url = _URL.sub("URL", line)
+        for m in _TILDE_SPACED.finditer(line_no_url):
+            _add(findings, "tilde-spacing", i, line, "물결표(~)는 앞말·뒷말에 붙여 쓴다",
+                 re.sub(r"\s*[~∼]\s*", "~", m.group(0)))
+        for m in _WEEKDAY_SPACED.finditer(line):
+            _add(findings, "weekday-paren-space", i, line, "날짜 뒤 요일 괄호는 붙여 쓴다",
+                 f"{m.group(1)}{m.group(2)}")
+        for m in _LAW_QUOTED.finditer(line):
+            _add(findings, "law-title-quotes", i, line,
+                 "법령·규정 이름은 낫표 「 」로 감싼다", f"「{m.group(1)}」")
+        for rx, repl, why in _SPACING_FIXES:
+            for m in rx.finditer(line):
+                _add(findings, "spacing-common", i, line, why, rx.sub(repl, m.group(0)))
         for m in _FOREIGN_ORDER.finditer(line_no_url):
             _add(findings, "foreign-order", i, line,
                  "한글을 먼저 쓰고 외국어를 괄호 안에 넣는다",
